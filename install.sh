@@ -60,7 +60,17 @@ else
 
   chmod +x "$INSTALL_SCRIPT"
   info "بدء تثبيت Claude Code (5-10 دقائق)..."
-  bash "$INSTALL_SCRIPT" || fail "فشل تثبيت Claude Code"
+
+  # سكربت تثبيت Claude Code تفاعلي (يطرح أسئلة y/n). عند التشغيل عبر
+  # 'curl | bash' يكون stdin هو أنبوب السكربت لا الطرفية، فتلتهم أوامر
+  # read أسطر هذا السكربت وتفشل. نوجّه إدخاله إلى الطرفية الحقيقية.
+  if [ -r /dev/tty ]; then
+    bash "$INSTALL_SCRIPT" < /dev/tty || fail "فشل تثبيت Claude Code"
+  else
+    warn "لا توجد طرفية تفاعلية (/dev/tty) — قد يفشل التثبيت التفاعلي."
+    warn "إن فشل، استنسخ المستودع وشغّل: bash install.sh"
+    bash "$INSTALL_SCRIPT" || fail "فشل تثبيت Claude Code"
+  fi
 
   # Reload PATH
   export PATH="$PATH:$HOME/.local/bin"
