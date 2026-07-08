@@ -107,7 +107,11 @@ function runChat(cfg, messages, { onToken, onDone, onError }) {
   if (!apiKey) return onError(new Error('المفتاح غير مضبوط'));
   if (!model)  return onError(new Error('اختر نموذجاً أولاً'));
 
-  const preferAnthropic = !base || /anthropic\.com/i.test(base);
+  // Aerolink / AgentRouter / Nara are Claude-Code gateways: they speak the
+  // Anthropic protocol and only accept requests that look like the Claude Code
+  // client, so prefer that path for them (using the user's own key).
+  const isClaudeGateway = /aerolink|agentrouter|bynara/i.test(base);
+  const preferAnthropic = !base || /anthropic\.com/i.test(base) || isClaudeGateway;
 
   const callOpenAI = (onFail) => {
     // Respect bases that already carry their API root (…/v1, …/openai, …/openai/v1)
@@ -144,9 +148,17 @@ function runChat(cfg, messages, { onToken, onDone, onError }) {
     const url = b + '/v1/messages';
     const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
     const msgs = messages.filter(m => m.role !== 'system');
+    const headers = { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' };
+    if (!/anthropic\.com/i.test(base)) {
+      // Present the same client identity Claude Code uses so gateways that only
+      // accept the official CLI recognise this client (user's own key/account).
+      headers['authorization'] = 'Bearer ' + apiKey;
+      headers['User-Agent'] = 'claude-cli/1.0.60 (external, cli)';
+      headers['x-app'] = 'cli';
+    }
     let started = false;
     postStream(url,
-      { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      headers,
       Object.assign({ model, max_tokens: 4096, stream: true, messages: msgs }, sys ? { system: sys } : {}),
       {
         onLine: line => {
