@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CoBWeaverClaw — Claude Code Web Bridge
+ * ClawBridge — Claude Code Web Bridge
  * يشغّل واجهة المتصفح ويربطها بـ Claude Code في Termux
  */
 
@@ -13,11 +13,14 @@ const os   = require('os');
 // ── Config ──────────────────────────────────────────────────────────────────
 const PORT     = process.env.CBW_PORT || 7979;
 const UI_FILE  = path.join(__dirname, 'index.html');
-const LOG_FILE = path.join(os.homedir(), '.cobweaverclaw', 'webbridge.log');
-const CFG_FILE = path.join(os.homedir(), '.cobweaverclaw', '.env');
+const CFG_DIR    = path.join(os.homedir(), '.clawbridge');
+const LOG_FILE   = path.join(CFG_DIR, 'webbridge.log');
+const CFG_FILE   = path.join(CFG_DIR, '.env');
+const UPLOAD_DIR = path.join(CFG_DIR, 'uploads');
+const MAX_UPLOAD = 300 * 1024 * 1024; // 300 MB
 
 // Ensure dirs
-try { fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true }); } catch (_) {}
+try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (_) {}
 
 // ── Logging ─────────────────────────────────────────────────────────────────
 function log(msg) {
@@ -128,6 +131,96 @@ function router(req, res) {
     }
   }
 
+  // ── POST /upload — stream large file to disk (up to 300MB, any type) ──
+  if (method === 'POST' && path_ === '/upload') {
+    const rawName = decodeURIComponent(
+      url.searchParams.get('name') || req.headers['x-filename'] || 'upload.bin'
+    );
+    const safe = (rawName.replace(/[\/\\]/g, '_')
+      .replace(/[^\w.\-() ؀-ۿ]/g, '_')
+      .slice(0, 180)) || 'upload.bin';
+    const dest = path.join(UPLOAD_DIR, `${Date.now()}_${safe}`);
+    const ws = fs.createWriteStream(dest);
+    let size = 0, aborted = false;
+
+    req.on('data', chunk => {
+      if (aborted) return;
+      size += chunk.length;
+      if (size > MAX_UPLOAD) {
+        aborted = true;
+        ws.destroy();
+        try { fs.unlinkSync(dest); } catch (_) {}
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'الملف أكبر من 300MB (الحد الأقصى)' }));
+        req.destroy();
+        return;
+      }
+      if (ws.write(chunk) === false) {
+        req.pause();
+        ws.once('drain', () => req.resume());
+      }
+    });
+    req.on('end', () => { if (!aborted) ws.end(); });
+    req.on('error', () => { if (!aborted) { aborted = true; ws.destroy(); } });
+    ws.on('finish', () => {
+      if (aborted) return;
+      log(`Uploaded ${dest} (${size} bytes)`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, path: dest, name: safe, size }));
+    });
+    ws.on('error', () => {
+      if (aborted) return;
+      aborted = true;
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'فشل حفظ الملف' }));
+    });
+    return;
+  }
+
+  // ── POST /models — discover available models from the platform ──
+  if (method === 'POST' && path_ === '/models') {
+    return readBody(req, body => {
+      let cfg;
+      try { cfg = JSON.parse(body || '{}'); }
+      catch (e) { res.writeHead(400); return res.end(JSON.stringify({ ok: false, error: 'bad request' })); }
+      const env = loadEnv();
+      const apiKey  = cfg.apiKey || env.ANTHROPIC_API_KEY || '';
+      const baseUrl = (cfg.baseUrl || env.ANTHROPIC_BASE_URL || '').trim().replace(/\/+$/, '');
+      if (!apiKey) { res.writeHead(400); return res.end(JSON.stringify({ ok: false, error: 'المفتاح مطلوب' })); }
+
+      const isAnthropic = !baseUrl || /anthropic\.com/i.test(baseUrl);
+      const candidates = [];
+      if (isAnthropic) {
+        const base = (baseUrl || 'https://api.anthropic.com').replace(/\/v1$/, '');
+        candidates.push({ url: base + '/v1/models', headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' } });
+      } else {
+        const bearer = { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };
+        if (/\/v1$/.test(baseUrl)) candidates.push({ url: baseUrl + '/models', headers: bearer });
+        else {
+          candidates.push({ url: baseUrl + '/v1/models', headers: bearer });
+          candidates.push({ url: baseUrl + '/models', headers: bearer });
+        }
+      }
+      let i = 0;
+      const tryNext = () => {
+        if (i >= candidates.length) {
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ ok: false, error: 'تعذّر جلب النماذج من المنصة' }));
+        }
+        const c = candidates[i++];
+        httpJson(c.url, c.headers, (err, json) => {
+          if (err || !json) return tryNext();
+          const arr = json.data || json.models || [];
+          const list = arr.map(m => (typeof m === 'string' ? m : (m.id || m.name))).filter(Boolean);
+          if (!list.length) return tryNext();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, models: list }));
+        });
+      };
+      tryNext();
+    });
+  }
+
   // ── GET /status ──
   if (method === 'GET' && path_ === '/status') {
     const env = loadEnv();
@@ -135,7 +228,7 @@ function router(req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       ok: true,
-      server: 'CoBWeaverClaw Bridge v1.0',
+      server: 'ClawBridge v1.0',
       claude_available: isClaudeAvailable(),
       api_key_set: hasKey,
       sessions: Object.keys(sessions).length,
@@ -265,6 +358,28 @@ function readBody(req, cb) {
   req.on('end', () => cb(data));
 }
 
+// GET a JSON endpoint (used to discover models on the configured platform)
+function httpJson(urlStr, headers, cb) {
+  let u;
+  try { u = new URL(urlStr); } catch (e) { return cb(e); }
+  const lib = u.protocol === 'http:' ? require('http') : require('https');
+  const req = lib.request(u, { method: 'GET', headers, timeout: 20000 }, res => {
+    let data = '';
+    res.on('data', d => data += d);
+    res.on('end', () => {
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        try { cb(null, JSON.parse(data)); }
+        catch (e) { cb(new Error('bad JSON')); }
+      } else {
+        cb(new Error('HTTP ' + res.statusCode));
+      }
+    });
+  });
+  req.on('error', cb);
+  req.on('timeout', () => req.destroy(new Error('timeout')));
+  req.end();
+}
+
 function isClaudeAvailable() {
   try { execSync('which claude', { stdio: 'ignore' }); return true; } catch (_) { return false; }
 }
@@ -288,7 +403,7 @@ server.listen(PORT, '0.0.0.0', () => {
 
   console.log('\n');
   console.log('╔══════════════════════════════════════════════════════╗');
-  console.log('║        CoBWeaverClaw — Claude Code Web Bridge        ║');
+  console.log('║            ClawBridge — Claude Code Web Bridge        ║');
   console.log('╠══════════════════════════════════════════════════════╣');
   console.log(`║  ✅  Server running                                   ║`);
   console.log(`║                                                        ║`);
