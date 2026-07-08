@@ -117,6 +117,17 @@ function router(req, res) {
     }
   }
 
+  // ── GET /logo.png — serve app icon ──
+  if (method === 'GET' && (path_ === '/logo.png' || path_ === '/favicon.ico')) {
+    try {
+      const img = fs.readFileSync(path.join(__dirname, 'logo.png'));
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' });
+      return res.end(img);
+    } catch (e) {
+      res.writeHead(404); return res.end('logo not found');
+    }
+  }
+
   // ── GET /status ──
   if (method === 'GET' && path_ === '/status') {
     const env = loadEnv();

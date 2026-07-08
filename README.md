@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="ClawBridge" width="140">
+</p>
+
 # ClawBridge
 
 Control Claude Code from your mobile browser — no desktop, no SSH.
