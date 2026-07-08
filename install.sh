@@ -67,6 +67,37 @@ else
   done
   [ "$dl_ok" = 1 ] || fail "فشل تنزيل سكريبت التثبيت بعد 10 محاولات — تحقق من الاتصال"
 
+  # ── ترقيع تنزيل الملف الكبير (233MB) ليصبح قابلاً للاستئناف ──────
+  # السكربت الأصلي ينزّل ثنائي Claude Code بأمر curl واحد بلا استئناف
+  # (--max-time 300)، فيفشل كلياً عند أي انقطاع. نستبدله بدالة تستخدم
+  # wget -c مع 10 محاولات. تحقّق الـ checksum في السكربت الأصلي يبقى
+  # كما هو ويضمن سلامة الملف النهائي حتى بعد الاستئناف.
+  if node -e '
+    const fs = require("fs"), f = process.argv[1];
+    let s = fs.readFileSync(f, "utf8");
+    const marker = `curl -fsSL --max-time 300 "$DL_BASE/linux-arm64/claude" -o "$BINARY.tmp"`;
+    if (!s.includes(marker)) process.exit(3);
+    const helper = [
+      "_cbw_dl_binary() {",
+      "  local url=\"$1\" out=\"$2\" a",
+      "  for a in 1 2 3 4 5 6 7 8 9 10; do",
+      "    wget -c -q --tries=1 --timeout=60 -O \"$out\" \"$url\" && return 0",
+      "    printf \"[!] binary download attempt %s/10 failed, resuming...\\n\" \"$a\" >&2",
+      "    sleep $(( a < 6 ? a * 3 : 15 ))",
+      "  done",
+      "  return 1",
+      "}",
+      ""
+    ].join("\n");
+    const call = `_cbw_dl_binary "$DL_BASE/linux-arm64/claude" "$BINARY.tmp"`;
+    s = s.replace(marker, () => helper + call);
+    fs.writeFileSync(f, s);
+  ' "$INSTALL_SCRIPT" 2>/dev/null; then
+    ok "تم تفعيل التنزيل القابل للاستئناف للملف الكبير (233MB)"
+  else
+    warn "تعذّر ترقيع سطر التنزيل (ربما تغيّر السكربت الأصلي) — سيُستخدم كما هو"
+  fi
+
   chmod +x "$INSTALL_SCRIPT"
   info "بدء تثبيت Claude Code (5-10 دقائق)..."
 
