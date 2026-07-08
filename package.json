@@ -1,0 +1,34 @@
+{
+  "name": "clawbridge",
+  "version": "1.0.0",
+  "description": "Control Claude Code from your mobile browser — a lightweight web interface for running Claude Code on Android via Termux.",
+  "main": "server.js",
+  "bin": {
+    "clawbridge": "server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "termux",
+    "android",
+    "web-interface",
+    "mobile",
+    "sse"
+  ],
+  "author": "basharbhassan336699-cell",
+  "license": "MIT",
+  "homepage": "https://github.com/basharbhassan336699-cell/ClawBridge",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/basharbhassan336699-cell/ClawBridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/basharbhassan336699-cell/ClawBridge/issues"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

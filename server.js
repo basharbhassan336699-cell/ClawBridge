@@ -12,7 +12,7 @@ const os   = require('os');
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const PORT     = process.env.CBW_PORT || 7979;
-const UI_FILE  = path.join(__dirname, 'claude-code-ui.html');
+const UI_FILE  = path.join(__dirname, 'index.html');
 const LOG_FILE = path.join(os.homedir(), '.cobweaverclaw', 'webbridge.log');
 const CFG_FILE = path.join(os.homedir(), '.cobweaverclaw', '.env');
 
@@ -295,7 +295,7 @@ server.listen(PORT, '0.0.0.0', () => {
 
 server.on('error', err => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`\n❌ البورت ${PORT} مشغول. شغّل: CBW_PORT=7980 node cbw-server.js\n`);
+    console.error(`\n❌ البورت ${PORT} مشغول. شغّل: CBW_PORT=7980 node server.js\n`);
   } else {
     console.error('Server error:', err);
   }

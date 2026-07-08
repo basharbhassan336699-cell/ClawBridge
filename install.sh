@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ══════════════════════════════════════════════════════════════════
-#  CoBWeaverClaw — Claude Code + Web Bridge Installer
+#  ClawBridge — Claude Code + Web Bridge Installer
 #  يثبّت Claude Code ثم يشغّل واجهة الويب تلقائياً
 # ══════════════════════════════════════════════════════════════════
 
@@ -17,17 +17,20 @@ ok()    { printf "${GREEN}[✓]${NC}    %s\n" "$1"; }
 warn()  { printf "${YELLOW}[!]${NC}    %s\n" "$1"; }
 fail()  { printf "${RED}[✗]${NC}    %s\n" "$1" >&2; exit 1; }
 
-CBW_DIR="$HOME/.cobweaverclaw"
-CBW_SERVER="$CBW_DIR/cbw-server.js"
-CBW_UI="$CBW_DIR/claude-code-ui.html"
+CBW_DIR="$HOME/.clawbridge"
+CBW_SERVER="$CBW_DIR/server.js"
+CBW_UI="$CBW_DIR/index.html"
 CBW_ENV="$CBW_DIR/.env"
 CBW_PORT="${CBW_PORT:-7979}"
+
+# مصدر الملفات عند التثبيت السريع (curl | bash)
+RAW_BASE="${CLAWBRIDGE_RAW_BASE:-https://raw.githubusercontent.com/basharbhassan336699-cell/ClawBridge/main}"
 
 mkdir -p "$CBW_DIR"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════╗"
-echo "║     CoBWeaverClaw — Claude Code Web Bridge           ║"
+echo "║            ClawBridge — Claude Code Web Bridge        ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo ""
 
@@ -67,37 +70,47 @@ else
   ok "Claude Code جاهز: $(claude --version 2>&1 | head -1)"
 fi
 
-# ── Step 4: نسخ ملفات البريدج ─────────────────────────────────────
+# ── Step 4: تجهيز ملفات البريدج ───────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# cbw-server.js
-if [ -f "$SCRIPT_DIR/cbw-server.js" ]; then
-  cp "$SCRIPT_DIR/cbw-server.js" "$CBW_SERVER"
-  ok "cbw-server.js نُسخ"
-elif [ ! -f "$CBW_SERVER" ]; then
-  fail "cbw-server.js غير موجود. ضعه في نفس مجلد هذا السكريبت"
+# ينزّل ملفاً من المستودع عند غيابه محلياً (حالة curl | bash)
+fetch_file() {
+  local name="$1" dest="$2"
+  info "تنزيل $name من المستودع..."
+  curl -fsSL "$RAW_BASE/$name" -o "$dest" \
+    || fail "فشل تنزيل $name — تحقق من الاتصال"
+}
+
+# server.js
+if [ -f "$SCRIPT_DIR/server.js" ]; then
+  cp "$SCRIPT_DIR/server.js" "$CBW_SERVER"
+  ok "server.js نُسخ"
+else
+  fetch_file "server.js" "$CBW_SERVER"
+  ok "server.js جاهز"
 fi
 
-# claude-code-ui.html
-if [ -f "$SCRIPT_DIR/claude-code-ui.html" ]; then
-  cp "$SCRIPT_DIR/claude-code-ui.html" "$CBW_UI"
-  ok "claude-code-ui.html نُسخ"
-elif [ ! -f "$CBW_UI" ]; then
-  fail "claude-code-ui.html غير موجود. ضعه في نفس مجلد هذا السكريبت"
+# index.html
+if [ -f "$SCRIPT_DIR/index.html" ]; then
+  cp "$SCRIPT_DIR/index.html" "$CBW_UI"
+  ok "index.html نُسخ"
+else
+  fetch_file "index.html" "$CBW_UI"
+  ok "index.html جاهز"
 fi
 
 # ── Step 5: إنشاء أمر التشغيل ─────────────────────────────────────
-LAUNCHER="$PREFIX/bin/cbw"
+LAUNCHER="$PREFIX/bin/clawbridge"
 cat > "$LAUNCHER" << LAUNCHER_EOF
 #!/data/data/com.termux/files/usr/bin/bash
-# CoBWeaverClaw Web Bridge Launcher
+# ClawBridge Web Bridge Launcher
 export PATH="\$PATH:\$HOME/.local/bin"
 export CBW_PORT="\${CBW_PORT:-7979}"
 cd "$CBW_DIR"
 exec node "$CBW_SERVER" "\$@"
 LAUNCHER_EOF
 chmod +x "$LAUNCHER"
-ok "أمر التشغيل: cbw"
+ok "أمر التشغيل: clawbridge"
 
 # ── Step 6: تشغيل السيرفر مباشرة ─────────────────────────────────
 echo ""
@@ -106,19 +119,23 @@ ok "التثبيت اكتمل!"
 echo "═══════════════════════════════════════════════════════"
 echo ""
 echo "  لتشغيل الواجهة في أي وقت:"
-echo "  $ cbw"
+echo "  $ clawbridge"
 echo ""
 echo "═══════════════════════════════════════════════════════"
 echo ""
 
-# ── تشغيل فوري ────────────────────────────────────────────────────
-read -r -p "هل تريد تشغيل الواجهة الآن؟ [Y/n] " LAUNCH
-case "${LAUNCH,,}" in
-  n|no) echo "شغّلها لاحقاً بـ: cbw" ;;
-  *)
-    export PATH="$PATH:$HOME/.local/bin"
-    export CBW_PORT="$CBW_PORT"
-    cd "$CBW_DIR"
-    exec node "$CBW_SERVER"
-    ;;
-esac
+# ── تشغيل فوري (فقط إن كانت الجلسة تفاعلية) ───────────────────────
+if [ -t 0 ]; then
+  read -r -p "هل تريد تشغيل الواجهة الآن؟ [Y/n] " LAUNCH
+  case "${LAUNCH,,}" in
+    n|no) echo "شغّلها لاحقاً بـ: clawbridge" ;;
+    *)
+      export PATH="$PATH:$HOME/.local/bin"
+      export CBW_PORT="$CBW_PORT"
+      cd "$CBW_DIR"
+      exec node "$CBW_SERVER"
+      ;;
+  esac
+else
+  echo "شغّلها بـ: clawbridge"
+fi
