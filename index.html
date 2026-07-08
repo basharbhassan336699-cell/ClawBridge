@@ -738,17 +738,8 @@ body {
     <div class="sheet-subtitle">Connect Claude Code to your API provider</div>
 
     <div class="sheet-field">
-      <label class="sheet-label">منصات مجانية (اضغط للتعبئة)</label>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
-        <button type="button" onclick="setPreset('https://openrouter.ai/api/v1','openrouter')"
-          style="background:#3a3a3c;border:1px solid #4a4a4c;color:#fff;border-radius:20px;padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer">OpenRouter</button>
-        <button type="button" onclick="setPreset('https://api.groq.com/openai/v1','groq')"
-          style="background:#3a3a3c;border:1px solid #4a4a4c;color:#fff;border-radius:20px;padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer">Groq</button>
-        <button type="button" onclick="setPreset('https://generativelanguage.googleapis.com/v1beta/openai','gemini')"
-          style="background:#3a3a3c;border:1px solid #4a4a4c;color:#fff;border-radius:20px;padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer">Gemini</button>
-        <button type="button" onclick="setPreset('','anthropic')"
-          style="background:#3a3a3c;border:1px solid #4a4a4c;color:#fff;border-radius:20px;padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer">Anthropic</button>
-      </div>
+      <label class="sheet-label">منصات جاهزة (اضغط للتعبئة)</label>
+      <div id="presetRow" style="display:flex;flex-wrap:wrap;gap:8px"></div>
       <div id="presetHint" style="font-size:11.5px;color:#e8a07a;margin-top:8px;line-height:1.7;min-height:14px"></div>
     </div>
 
@@ -797,6 +788,7 @@ let outputBuffer      = '';
 
 // ── Init ──────────────────────────────────────────────────────────
 window.addEventListener('load', async () => {
+  renderPresets();
   loadLocalConfig();
   await checkServerStatus();
 });
@@ -965,16 +957,44 @@ function updateSendBtn() {
   if (b) b.style.display = has ? 'flex' : 'none';
 }
 
-// ── Free-provider presets ─────────────────────────────────────────
-function setPreset(url, kind) {
-  document.getElementById('baseUrl').value = url;
-  const hints = {
-    openrouter: 'مفتاح مجاني من openrouter.ai/keys — بعد «جلب النماذج» اختر نموذجاً ينتهي بـ ‎:free',
-    groq: 'مفتاح مجاني من console.groq.com/keys — سريع ومجاني (مثل llama-3.3-70b)',
-    gemini: 'مفتاح مجاني من aistudio.google.com/apikey — اختر gemini-2.0-flash',
-    anthropic: 'اترك الرابط فارغاً. مفتاح Anthropic مدفوع (ليس مجانياً).',
-  };
-  document.getElementById('presetHint').textContent = hints[kind] || '';
+// ── Provider presets ──────────────────────────────────────────────
+const PROVIDERS = [
+  { name: 'OpenRouter', base: 'https://openrouter.ai/api/v1',
+    hint: 'مجاني: openrouter.ai/keys — بعد «جلب النماذج» اختر نموذجاً ينتهي بـ ‎:free' },
+  { name: 'Groq', base: 'https://api.groq.com/openai/v1',
+    hint: 'مجاني وسريع: console.groq.com/keys — مثل llama-3.3-70b-versatile' },
+  { name: 'Gemini', base: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    hint: 'مجاني: aistudio.google.com/apikey — نموذج gemini-2.0-flash' },
+  { name: 'NVIDIA', base: 'https://integrate.api.nvidia.com/v1',
+    hint: 'مجاني: build.nvidia.com — المفتاح يبدأ بـ nvapi-' },
+  { name: 'Agent Router', base: 'https://agentrouter.org/v1',
+    hint: 'agentrouter.org — المفتاح يبدأ بـ sk- (رصيد مجاني عند التسجيل)' },
+  { name: 'Nara Router', base: 'https://router.bynara.id/v1',
+    hint: 'router.bynara.id — المفتاح sk-nara- ، نموذج مثل auto/bynara' },
+  { name: 'Aerolink', base: 'https://capi.aerolink.lat/v1',
+    hint: 'aerolink.lat — يتطلب خطة/رصيداً مدفوعاً في حسابك.' },
+  { name: 'Cloudflare', base: 'https://api.cloudflare.com/client/v4/accounts/ACCOUNT_ID/ai/v1',
+    hint: 'استبدل ACCOUNT_ID بمعرّف حسابك من dash.cloudflare.com — نموذج مثل @cf/meta/llama-3.1-8b-instruct' },
+  { name: 'Anthropic', base: '',
+    hint: 'اترك الرابط فارغاً — مفتاح Anthropic رسمي (مدفوع).' },
+];
+function renderPresets() {
+  const row = document.getElementById('presetRow');
+  if (!row) return;
+  row.innerHTML = '';
+  PROVIDERS.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = p.name;
+    b.style.cssText = 'background:#3a3a3c;border:1px solid #4a4a4c;color:#fff;border-radius:20px;padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer';
+    b.onclick = () => setPreset(i);
+    row.appendChild(b);
+  });
+}
+function setPreset(i) {
+  const p = PROVIDERS[i];
+  document.getElementById('baseUrl').value = p.base;
+  document.getElementById('presetHint').textContent = p.hint || '';
 }
 
 // ── Model discovery ───────────────────────────────────────────────

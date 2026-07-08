@@ -70,7 +70,7 @@ function postStream(urlStr, headers, bodyObj, cbs) {
   const data = Buffer.from(JSON.stringify(bodyObj));
   const req = lib.request(u, {
     method: 'POST',
-    headers: { ...headers, 'Content-Length': data.length },
+    headers: { 'User-Agent': 'ClawBridge/1.0', ...headers, 'Content-Length': data.length },
     timeout: 180000,
   }, res => {
     if (res.statusCode < 200 || res.statusCode >= 300) {
@@ -115,7 +115,12 @@ function runChat(cfg, messages, { onToken, onDone, onError }) {
     const url = root + '/chat/completions';
     let started = false;
     postStream(url,
-      { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      {
+        'Authorization': 'Bearer ' + apiKey,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://github.com/basharbhassan336699-cell/ClawBridge',
+        'X-Title': 'ClawBridge',
+      },
       { model, messages, stream: true },
       {
         onLine: line => {
