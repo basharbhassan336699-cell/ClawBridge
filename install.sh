@@ -41,7 +41,7 @@ echo ""
 # ── Step 2: تحديث الحزم الأساسية ─────────────────────────────────
 info "تحديث الحزم..."
 pkg update -y -q 2>/dev/null || true
-pkg install -y -q nodejs curl git 2>/dev/null || fail "فشل تثبيت المتطلبات"
+pkg install -y -q nodejs curl git wget 2>/dev/null || fail "فشل تثبيت المتطلبات"
 ok "المتطلبات الأساسية جاهزة"
 
 # ── Step 3: تثبيت Claude Code ─────────────────────────────────────
@@ -52,11 +52,20 @@ else
   info "جاري تنزيل سكريبت التثبيت..."
 
   INSTALL_SCRIPT="$CBW_DIR/claude-install.sh"
+  INSTALL_URL="https://raw.githubusercontent.com/ferrumclaudepilgrim/claude-code-android/main/install.sh"
 
-  curl -fsSL \
-    "https://raw.githubusercontent.com/ferrumclaudepilgrim/claude-code-android/main/install.sh" \
-    -o "$INSTALL_SCRIPT" 2>/dev/null \
-    || fail "فشل تنزيل سكريبت التثبيت — تحقق من الاتصال"
+  # تنزيل باستئناف تلقائي (wget -c) مع إعادة محاولة حتى 10 مرات،
+  # لإكمال التنزيل عند انقطاع الاتصال بدل البدء من الصفر.
+  dl_ok=0
+  for attempt in $(seq 1 10); do
+    if wget -c -q -O "$INSTALL_SCRIPT" "$INSTALL_URL"; then
+      dl_ok=1
+      break
+    fi
+    warn "فشلت محاولة التنزيل $attempt/10 — إعادة المحاولة..."
+    sleep $(( attempt < 6 ? attempt * 2 : 12 ))
+  done
+  [ "$dl_ok" = 1 ] || fail "فشل تنزيل سكريبت التثبيت بعد 10 محاولات — تحقق من الاتصال"
 
   chmod +x "$INSTALL_SCRIPT"
   info "بدء تثبيت Claude Code (5-10 دقائق)..."
