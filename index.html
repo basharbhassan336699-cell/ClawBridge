@@ -858,46 +858,59 @@ async function newSession() {
 }
 
 // ── SSE stream ────────────────────────────────────────────────────
+let asstEl = null;   // the assistant bubble currently being streamed into
 function connectSession(id) {
   if (sseSource) sseSource.close();
   currentSessionId = id;
+  asstEl = null;
   sseSource = new EventSource(`${API}/session/${id}/stream`);
   sseSource.onmessage = e => {
-    try {
-      const { type, data } = JSON.parse(e.data);
-      appendOutput(type, data);
-    } catch (_) {}
+    try { const { type, data } = JSON.parse(e.data); handleStream(type, data); } catch (_) {}
   };
-  sseSource.onerror = () => {
-    appendOutput('system', '[اتصال SSE انقطع]');
-  };
+  sseSource.onerror = () => { /* auto-reconnects; no noisy toast */ };
 }
 
-// ── Output display ────────────────────────────────────────────────
+// ── Output display (chat bubbles) ─────────────────────────────────
 function clearOutput() {
-  outputBuffer = '';
+  asstEl = null;
   const out = document.getElementById('outputArea');
   if (out) out.innerHTML = '';
 }
 
-function appendOutput(type, text) {
-  showLoading(false);
-  let out = document.getElementById('outputArea');
-  if (!out) return;
-
-  const line = document.createElement('div');
-  line.style.cssText = 'font-family:SF Mono,Fira Code,monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;padding:2px 0;';
-
-  if (type === 'stderr' || type === 'system') {
-    line.style.color = type === 'system' ? '#636366' : '#ff6b6b';
-  } else {
-    line.style.color = '#e8e8e8';
-  }
-
-  line.textContent = text;
-  out.appendChild(line);
-  out.scrollTop = out.scrollHeight;
+function scrollOut() {
+  const out = document.getElementById('outputArea');
+  if (out) out.scrollTop = out.scrollHeight;
 }
+
+function renderBubble(text, cls) {
+  const out = document.getElementById('outputArea');
+  if (!out) return null;
+  const d = document.createElement('div');
+  const base = 'margin:8px 0;padding:10px 13px;border-radius:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word;max-width:90%;';
+  if (cls === 'user')       d.style.cssText = base + 'background:#2a4d6e;margin-left:auto;border-bottom-right-radius:4px;font-size:14px;';
+  else if (cls === 'assistant') d.style.cssText = base + 'background:#2c2c2e;border:0.5px solid #3a3a3c;border-bottom-left-radius:4px;font-family:SF Mono,Fira Code,monospace;font-size:13px;';
+  else if (cls === 'error')  d.style.cssText = base + 'background:rgba(255,69,58,.12);color:#ff9b9b;border:0.5px solid rgba(255,69,58,.3);font-size:12.5px;margin:8px auto;';
+  else                       d.style.cssText = base + 'background:transparent;color:#8e8e93;font-size:12px;text-align:center;margin:6px auto;';
+  d.textContent = text;
+  out.appendChild(d);
+  scrollOut();
+  return d;
+}
+
+// Route a streamed server event to the chat UI
+function handleStream(type, data) {
+  showLoading(false);
+  if (type === 'user')                { asstEl = null; renderBubble(data, 'user'); }
+  else if (type === 'assistant_start'){ asstEl = renderBubble('', 'assistant'); }
+  else if (type === 'assistant')      { if (!asstEl) asstEl = renderBubble('', 'assistant'); asstEl.textContent += data; scrollOut(); }
+  else if (type === 'assistant_done') { asstEl = null; }
+  else if (type === 'error')          { asstEl = null; renderBubble(data, 'error'); }
+  else if (type === 'system')         { renderBubble(data, 'system'); }
+  else { if (!asstEl) asstEl = renderBubble('', 'assistant'); asstEl.textContent += (data || ''); scrollOut(); }
+}
+
+// Back-compat wrapper for older call sites
+function appendOutput(type, text) { handleStream(type === 'stderr' ? 'error' : type, text); }
 
 // ── Send input ────────────────────────────────────────────────────
 async function sendMessage() {

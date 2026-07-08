@@ -41,60 +41,123 @@ function loadEnv() {
   return cfg;
 }
 
-// ── Active claude sessions ────────────────────────────────────────────────────
-const sessions = {};   // id -> { proc, output[], input_cb }
+// ── Chat sessions (direct platform API: OpenAI-compatible + Anthropic) ────────
+const sessions = {};   // id -> { id, cfg, messages[], output[], clients:Set, busy }
 let sessionCounter = 0;
 
 function createSession(cfg) {
   const id = `session_${++sessionCounter}_${Date.now()}`;
-  const env = {
-    ...process.env,
-    ANTHROPIC_API_KEY:  cfg.apiKey  || process.env.ANTHROPIC_API_KEY  || '',
-    ANTHROPIC_BASE_URL: cfg.baseUrl || process.env.ANTHROPIC_BASE_URL || '',
-    ...(cfg.model ? { ANTHROPIC_MODEL: cfg.model } : {}),
-    TERM: 'xterm-256color',
-  };
-
-  // Find claude binary
-  let claudeBin = 'claude';
-  try { claudeBin = execSync('which claude', { encoding: 'utf8' }).trim(); } catch (_) {}
-
-  const proc = spawn(claudeBin, ['--no-color'], {
-    env,
-    cwd: cfg.workdir || os.homedir(),
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-
-  const session = { id, proc, output: [], clients: new Set(), alive: true };
-  sessions[id] = session;
-
-  const push = (type, data) => {
-    const entry = { type, data, ts: Date.now() };
-    session.output.push(entry);
-    // keep last 2000 lines
-    if (session.output.length > 2000) session.output.shift();
-    session.clients.forEach(res => {
-      try {
-        res.write(`data: ${JSON.stringify(entry)}\n\n`);
-      } catch (_) {}
-    });
-  };
-
-  proc.stdout.on('data', d => push('stdout', d.toString()));
-  proc.stderr.on('data', d => push('stderr', d.toString()));
-  proc.on('close', code => {
-    session.alive = false;
-    push('system', `[session ended — exit code ${code}]`);
-    log(`Session ${id} closed (exit ${code})`);
-  });
-  proc.on('error', err => {
-    session.alive = false;
-    push('system', `[error: ${err.message}]`);
-    log(`Session ${id} error: ${err.message}`);
-  });
-
-  log(`Session ${id} started (pid ${proc.pid})`);
+  sessions[id] = { id, cfg: cfg || {}, messages: [], output: [], clients: new Set(), busy: false };
+  log(`Session ${id} created`);
   return id;
+}
+
+// Store an output entry and broadcast it to all connected SSE clients.
+function pushEntry(session, type, data) {
+  const entry = { type, data, ts: Date.now() };
+  session.output.push(entry);
+  if (session.output.length > 4000) session.output.shift();
+  session.clients.forEach(res => {
+    try { res.write(`data: ${JSON.stringify(entry)}\n\n`); } catch (_) {}
+  });
+}
+
+// Low-level: POST a JSON body and deliver the response stream line-by-line.
+function postStream(urlStr, headers, bodyObj, cbs) {
+  let u;
+  try { u = new URL(urlStr); } catch (e) { return cbs.onError(e); }
+  const lib = u.protocol === 'http:' ? require('http') : require('https');
+  const data = Buffer.from(JSON.stringify(bodyObj));
+  const req = lib.request(u, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Length': data.length },
+    timeout: 180000,
+  }, res => {
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      let err = ''; res.on('data', d => err += d);
+      res.on('end', () => cbs.onError(new Error('HTTP ' + res.statusCode + ': ' + err.slice(0, 400)), res.statusCode));
+      return;
+    }
+    res.setEncoding('utf8');
+    let buf = '';
+    res.on('data', chunk => {
+      buf += chunk;
+      let idx;
+      while ((idx = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, idx).replace(/\r$/, '');
+        buf = buf.slice(idx + 1);
+        cbs.onLine(line);
+      }
+    });
+    res.on('end', () => { if (buf) cbs.onLine(buf); cbs.onEnd(); });
+    res.on('error', e => cbs.onError(e));
+  });
+  req.on('error', e => cbs.onError(e));
+  req.on('timeout', () => req.destroy(new Error('timeout')));
+  req.write(data); req.end();
+}
+
+// High-level: stream a chat reply from the configured platform.
+// Auto-detects OpenAI-compatible vs Anthropic and falls back to the other
+// protocol if the preferred one fails before producing any tokens.
+function runChat(cfg, messages, { onToken, onDone, onError }) {
+  const apiKey = (cfg.apiKey || '').trim();
+  const base   = (cfg.baseUrl || '').trim().replace(/\/+$/, '');
+  const model  = (cfg.model || '').trim();
+  if (!apiKey) return onError(new Error('المفتاح غير مضبوط'));
+  if (!model)  return onError(new Error('اختر نموذجاً أولاً'));
+
+  const preferAnthropic = !base || /anthropic\.com/i.test(base);
+
+  const callOpenAI = (onFail) => {
+    const url = (/\/v1$/.test(base) ? base : base + '/v1') + '/chat/completions';
+    let started = false;
+    postStream(url,
+      { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      { model, messages, stream: true },
+      {
+        onLine: line => {
+          const s = line.trim();
+          if (!s.startsWith('data:')) return;
+          const p = s.slice(5).trim();
+          if (p === '[DONE]') return;
+          try {
+            const j = JSON.parse(p);
+            const t = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+            if (t) { started = true; onToken(t); }
+          } catch (_) {}
+        },
+        onEnd: () => { if (started) onDone(); else if (onFail) onFail(new Error('لا رد من المنصة')); else onDone(); },
+        onError: (e) => { if (!started && onFail) onFail(e); else onError(e); },
+      });
+  };
+
+  const callAnthropic = (onFail) => {
+    const b = /\/v1$/.test(base) ? base.replace(/\/v1$/, '') : (base || 'https://api.anthropic.com');
+    const url = b + '/v1/messages';
+    const sys = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
+    const msgs = messages.filter(m => m.role !== 'system');
+    let started = false;
+    postStream(url,
+      { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+      Object.assign({ model, max_tokens: 4096, stream: true, messages: msgs }, sys ? { system: sys } : {}),
+      {
+        onLine: line => {
+          const s = line.trim();
+          if (!s.startsWith('data:')) return;
+          const p = s.slice(5).trim();
+          try {
+            const j = JSON.parse(p);
+            if (j.type === 'content_block_delta' && j.delta && j.delta.text) { started = true; onToken(j.delta.text); }
+          } catch (_) {}
+        },
+        onEnd: () => { if (started) onDone(); else if (onFail) onFail(new Error('لا رد من المنصة')); else onDone(); },
+        onError: (e) => { if (!started && onFail) onFail(e); else onError(e); },
+      });
+  };
+
+  if (preferAnthropic) callAnthropic(() => callOpenAI(null));
+  else                 callOpenAI(() => callAnthropic(null));
 }
 
 // ── HTTP Router ──────────────────────────────────────────────────────────────
@@ -232,7 +295,7 @@ function router(req, res) {
       claude_available: isClaudeAvailable(),
       api_key_set: hasKey,
       sessions: Object.keys(sessions).length,
-      active: Object.values(sessions).filter(s => s.alive).length,
+      active: Object.values(sessions).filter(s => s.busy).length,
     }));
   }
 
@@ -302,23 +365,56 @@ function router(req, res) {
     return;
   }
 
-  // ── POST /session/:id/input — send text to claude ──
+  // ── POST /session/:id/input — send a user message; stream the reply ──
   const inputMatch = path_.match(/^\/session\/([^/]+)\/input$/);
   if (method === 'POST' && inputMatch) {
     const id = inputMatch[1];
     const session = sessions[id];
-    if (!session || !session.alive) {
-      res.writeHead(404); return res.end(JSON.stringify({ ok: false, error: 'Session not found or ended' }));
+    if (!session) {
+      res.writeHead(404); return res.end(JSON.stringify({ ok: false, error: 'الجلسة غير موجودة' }));
     }
     return readBody(req, body => {
-      try {
-        const { text } = JSON.parse(body);
-        session.proc.stdin.write(text + '\n');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true }));
-      } catch (e) {
-        res.writeHead(400); res.end(JSON.stringify({ ok: false, error: e.message }));
+      let text;
+      try { text = (JSON.parse(body) || {}).text; }
+      catch (e) { res.writeHead(400); return res.end(JSON.stringify({ ok: false, error: 'bad request' })); }
+      if (!text || !text.trim()) {
+        res.writeHead(400); return res.end(JSON.stringify({ ok: false, error: 'رسالة فارغة' }));
       }
+
+      // Prefer the latest saved settings (so changing model/platform applies
+      // immediately), then fall back to the session's original config.
+      const env = loadEnv();
+      const cfg = {
+        apiKey:  env.ANTHROPIC_API_KEY  || session.cfg.apiKey  || '',
+        baseUrl: env.ANTHROPIC_BASE_URL || session.cfg.baseUrl || '',
+        model:   env.ANTHROPIC_MODEL    || session.cfg.model   || '',
+      };
+
+      // Record + echo the user's message, then ack the POST immediately.
+      session.messages.push({ role: 'user', content: text });
+      pushEntry(session, 'user', text);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+
+      if (session.busy) { pushEntry(session, 'system', '[انتظر — يوجد رد قيد التوليد]'); return; }
+      session.busy = true;
+      let acc = '';
+      pushEntry(session, 'assistant_start', '');
+      runChat(cfg, session.messages, {
+        onToken: t => { acc += t; pushEntry(session, 'assistant', t); },
+        onDone: () => {
+          session.messages.push({ role: 'assistant', content: acc });
+          pushEntry(session, 'assistant_done', '');
+          session.busy = false;
+        },
+        onError: e => {
+          // roll back the failed turn so the next try starts clean
+          if (session.messages[session.messages.length - 1]?.role === 'user') session.messages.pop();
+          pushEntry(session, 'error', 'تعذّر الاتصال بالمنصة: ' + e.message);
+          pushEntry(session, 'assistant_done', '');
+          session.busy = false;
+        },
+      });
     });
   }
 
@@ -329,22 +425,22 @@ function router(req, res) {
     const session = sessions[id];
     if (!session) { res.writeHead(404); return res.end('{}'); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ id, alive: session.alive, lines: session.output.length }));
+    return res.end(JSON.stringify({ id, busy: session.busy, turns: session.messages.length }));
   }
 
   // ── GET /sessions — list all ──
   if (method === 'GET' && path_ === '/sessions') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(
-      Object.values(sessions).map(s => ({ id: s.id, alive: s.alive, lines: s.output.length }))
+      Object.values(sessions).map(s => ({ id: s.id, busy: s.busy, turns: s.messages.length }))
     ));
   }
 
-  // ── POST /session/:id/kill ──
+  // ── POST /session/:id/kill — drop a session ──
   const killMatch = path_.match(/^\/session\/([^/]+)\/kill$/);
   if (method === 'POST' && killMatch) {
     const session = sessions[killMatch[1]];
-    if (session && session.alive) { session.proc.kill(); }
+    if (session) { session.clients.forEach(r => { try { r.end(); } catch (_) {} }); delete sessions[killMatch[1]]; }
     res.writeHead(200); return res.end(JSON.stringify({ ok: true }));
   }
 
