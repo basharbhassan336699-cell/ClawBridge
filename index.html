@@ -738,8 +738,23 @@ body {
     <div class="sheet-subtitle">Connect Claude Code to your API provider</div>
 
     <div class="sheet-field">
+      <label class="sheet-label">منصات مجانية (اضغط للتعبئة)</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <button type="button" onclick="setPreset('https://openrouter.ai/api/v1','openrouter')"
+          style="background:#3a3a3c;border:1px solid #4a4a4c;color:#fff;border-radius:20px;padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer">OpenRouter</button>
+        <button type="button" onclick="setPreset('https://api.groq.com/openai/v1','groq')"
+          style="background:#3a3a3c;border:1px solid #4a4a4c;color:#fff;border-radius:20px;padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer">Groq</button>
+        <button type="button" onclick="setPreset('https://generativelanguage.googleapis.com/v1beta/openai','gemini')"
+          style="background:#3a3a3c;border:1px solid #4a4a4c;color:#fff;border-radius:20px;padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer">Gemini</button>
+        <button type="button" onclick="setPreset('','anthropic')"
+          style="background:#3a3a3c;border:1px solid #4a4a4c;color:#fff;border-radius:20px;padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer">Anthropic</button>
+      </div>
+      <div id="presetHint" style="font-size:11.5px;color:#e8a07a;margin-top:8px;line-height:1.7;min-height:14px"></div>
+    </div>
+
+    <div class="sheet-field">
       <label class="sheet-label">Base URL</label>
-      <input class="sheet-input" id="baseUrl" type="url" placeholder="https://capi.aerolink.lat" dir="ltr">
+      <input class="sheet-input" id="baseUrl" type="url" placeholder="https://openrouter.ai/api/v1" dir="ltr">
     </div>
 
     <div class="sheet-field">
@@ -948,6 +963,18 @@ function updateSendBtn() {
     || attachedFilesList.length > 0;
   const b = document.getElementById('sendBtn');
   if (b) b.style.display = has ? 'flex' : 'none';
+}
+
+// ── Free-provider presets ─────────────────────────────────────────
+function setPreset(url, kind) {
+  document.getElementById('baseUrl').value = url;
+  const hints = {
+    openrouter: 'مفتاح مجاني من openrouter.ai/keys — بعد «جلب النماذج» اختر نموذجاً ينتهي بـ ‎:free',
+    groq: 'مفتاح مجاني من console.groq.com/keys — سريع ومجاني (مثل llama-3.3-70b)',
+    gemini: 'مفتاح مجاني من aistudio.google.com/apikey — اختر gemini-2.0-flash',
+    anthropic: 'اترك الرابط فارغاً. مفتاح Anthropic مدفوع (ليس مجانياً).',
+  };
+  document.getElementById('presetHint').textContent = hints[kind] || '';
 }
 
 // ── Model discovery ───────────────────────────────────────────────

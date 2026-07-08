@@ -110,7 +110,9 @@ function runChat(cfg, messages, { onToken, onDone, onError }) {
   const preferAnthropic = !base || /anthropic\.com/i.test(base);
 
   const callOpenAI = (onFail) => {
-    const url = (/\/v1$/.test(base) ? base : base + '/v1') + '/chat/completions';
+    // Respect bases that already carry their API root (…/v1, …/openai, …/openai/v1)
+    const root = /\/(v1|openai)$/i.test(base) ? base : base + '/v1';
+    const url = root + '/chat/completions';
     let started = false;
     postStream(url,
       { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
@@ -258,7 +260,7 @@ function router(req, res) {
         candidates.push({ url: base + '/v1/models', headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' } });
       } else {
         const bearer = { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };
-        if (/\/v1$/.test(baseUrl)) candidates.push({ url: baseUrl + '/models', headers: bearer });
+        if (/\/(v1|openai)$/i.test(baseUrl)) candidates.push({ url: baseUrl + '/models', headers: bearer });
         else {
           candidates.push({ url: baseUrl + '/v1/models', headers: bearer });
           candidates.push({ url: baseUrl + '/models', headers: bearer });
@@ -381,13 +383,13 @@ function router(req, res) {
         res.writeHead(400); return res.end(JSON.stringify({ ok: false, error: 'رسالة فارغة' }));
       }
 
-      // Prefer the latest saved settings (so changing model/platform applies
-      // immediately), then fall back to the session's original config.
+      // Use the config the session was created with; fall back to the saved
+      // .env only for fields the session didn't provide.
       const env = loadEnv();
       const cfg = {
-        apiKey:  env.ANTHROPIC_API_KEY  || session.cfg.apiKey  || '',
-        baseUrl: env.ANTHROPIC_BASE_URL || session.cfg.baseUrl || '',
-        model:   env.ANTHROPIC_MODEL    || session.cfg.model   || '',
+        apiKey:  session.cfg.apiKey  || env.ANTHROPIC_API_KEY  || '',
+        baseUrl: session.cfg.baseUrl || env.ANTHROPIC_BASE_URL || '',
+        model:   session.cfg.model   || env.ANTHROPIC_MODEL    || '',
       };
 
       // Record + echo the user's message, then ack the POST immediately.
