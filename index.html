@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Code</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  background: #1c1c1e;
+  color: #fff;
+  height: 100vh;
+  overflow: hidden;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+}
+
+/* ═══ SCREEN 1: Sessions List ═══ */
+#screen-list {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #1c1c1e;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+
+.top-bar-icon {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+
+.top-bar-icon svg { width: 22px; height: 22px; color: #fff; }
+
+.top-bar-title {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #fff;
+}
+
+/* Sessions scroll area */
+.sessions-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0 100px;
+  scrollbar-width: none;
+}
+.sessions-scroll::-webkit-scrollbar { display: none; }
+
+.section-header {
+  padding: 20px 16px 8px;
+  font-size: 13px;
+  color: #8e8e93;
+  font-weight: 400;
+}
+
+/* Session card */
+.session-card {
+  margin: 0 12px 10px;
+  background: #2c2c2e;
+  border-radius: 16px;
+  padding: 14px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  position: relative;
+  min-height: 68px;
+}
+
+.session-card:active { opacity: 0.7; }
+
+.session-text { flex: 1; min-width: 0; }
+
+.session-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+
+.session-repo {
+  font-size: 12px;
+  color: #8e8e93;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-repo svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+/* The dashed circle button */
+.session-action-btn {
+  width: 36px; height: 36px;
+  background: #3a3a3c;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.session-action-btn svg { width: 20px; height: 20px; color: #8e8e93; }
+
+/* New session FAB */
+.fab-container {
+  position: absolute;
+  bottom: 28px;
+  left: 0; right: 0;
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 16px;
+}
+
+.fab {
+  background: #e8774a;
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  padding: 14px 22px;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  letter-spacing: -0.2px;
+}
+
+.fab svg { width: 18px; height: 18px; }
+
+/* ═══ FILTER DROPDOWN ═══ */
+.filter-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: none;
+}
+.filter-overlay.open { display: block; }
+
+.filter-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+}
+
+.filter-menu {
+  position: absolute;
+  top: 52px;
+  left: 12px;
+  background: #2c2c2e;
+  border-radius: 14px;
+  width: 220px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.filter-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  font-size: 16px;
+  color: #fff;
+  cursor: pointer;
+  border-bottom: 0.5px solid #3a3a3c;
+}
+.filter-item:last-child { border-bottom: none; }
+.filter-item:active { background: #3a3a3c; }
+
+.filter-item-left { display: flex; align-items: center; gap: 10px; }
+.filter-item svg { width: 18px; height: 18px; color: #8e8e93; }
+
+.filter-item.active { color: #4a9eff; }
+.filter-item.active .filter-check { color: #4a9eff; }
+.filter-item.active svg { color: #4a9eff; }
+
+.filter-check { width: 18px; height: 18px; }
+.filter-divider { height: 0.5px; background: #3a3a3c; }
+.filter-item.archived { border-top: 0.5px solid #3a3a3c; }
+
+/* ═══ SCREEN 2: Session View ═══ */
+#screen-session {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #1c1c1e;
+  display: none;
+}
+
+.session-header {
+  display: flex;
+  align-items: center;
+  padding: 14px 14px 10px;
+  gap: 8px;
+  border-bottom: 0.5px solid #3a3a3c;
+}
+
+.session-header-dots {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+
+.session-header-dots svg { width: 20px; height: 20px; color: #fff; }
+
+.session-header-center { flex: 1; text-align: center; min-width: 0; }
+
+.session-header-title {
+  font-size: 15px; font-weight: 600; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.session-header-repo {
+  font-size: 12px; color: #8e8e93;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.session-header-pr {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+.session-header-pr svg { width: 20px; height: 20px; color: #fff; }
+
+.session-header-arrow {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+.session-header-arrow svg { width: 20px; height: 20px; color: #fff; }
+
+/* Loading state */
+.session-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.pixel-claude {
+  width: 80px; height: 64px;
+  image-rendering: pixelated;
+  animation: walk 0.6s steps(2) infinite;
+}
+
+@keyframes walk {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+
+.loading-text {
+  font-size: 16px;
+  color: #8e8e93;
+  font-weight: 400;
+}
+
+/* Context menu */
+.context-menu-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: none;
+}
+.context-menu-overlay.open { display: block; }
+
+.context-menu {
+  position: absolute;
+  top: 52px;
+  left: 12px;
+  background: #2c2c2e;
+  border-radius: 14px;
+  width: 260px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.context-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  font-size: 16px;
+  color: #fff;
+  cursor: pointer;
+  border-bottom: 0.5px solid #3a3a3c;
+}
+.context-item:last-child { border-bottom: none; }
+.context-item:active { background: #3a3a3c; }
+.context-item.delete { color: #ff453a; }
+
+.context-item-right { text-align: right; }
+.context-item-title { font-size: 16px; color: #fff; }
+.context-item-sub { font-size: 12px; color: #8e8e93; margin-top: 2px; }
+.context-item-icon { width: 22px; height: 22px; color: #8e8e93; }
+.context-item.delete .context-item-icon { color: #ff453a; }
+
+/* Bottom input bar */
+.input-bar {
+  padding: 10px 14px 24px;
+  background: #1c1c1e;
+}
+
+.input-box {
+  background: #2c2c2e;
+  border-radius: 16px;
+  padding: 12px 16px 48px;
+  position: relative;
+}
+
+.input-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  color: #fff;
+  font-family: inherit;
+  resize: none;
+  min-height: 24px;
+  max-height: 120px;
+  line-height: 1.4;
+  padding: 0;
+  caret-color: #fff;
+}
+.input-textarea::placeholder { color: #636366; }
+
+.input-actions {
+  position: absolute;
+  bottom: 10px;
+  left: 10px; right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.input-action-left { display: flex; gap: 8px; align-items: center; }
+
+.input-mic {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.input-mic svg { width: 22px; height: 22px; color: #8e8e93; }
+
+.input-accept {
+  background: #3a3a3c;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 15px;
+  color: #fff;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  font-family: inherit;
+  border: none;
+}
+
+.input-accept-code {
+  font-size: 13px;
+  color: #8e8e93;
+}
+
+.input-clip {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.input-clip svg { width: 22px; height: 22px; color: #8e8e93; }
+
+/* ═══ SETTINGS MODAL ═══ */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.settings-overlay.open { display: flex; }
+
+.settings-sheet {
+  background: #2c2c2e;
+  border-radius: 20px 20px 0 0;
+  padding: 12px 20px 44px;
+  width: 100%;
+  max-width: 430px;
+  animation: slideUp 0.28s cubic-bezier(.25,.46,.45,.94);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: #48484a;
+  border-radius: 2px;
+  margin: 0 auto 20px;
+}
+
+.sheet-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.sheet-subtitle {
+  font-size: 14px;
+  color: #8e8e93;
+  margin-bottom: 24px;
+}
+
+.sheet-field { margin-bottom: 16px; }
+
+.sheet-label {
+  font-size: 13px;
+  color: #8e8e93;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.sheet-input {
+  width: 100%;
+  background: #3a3a3c;
+  border: none;
+  border-radius: 12px;
+  padding: 13px 14px;
+  color: #fff;
+  font-size: 15px;
+  font-family: 'SF Mono', 'Courier New', monospace;
+  outline: none;
+  direction: ltr;
+}
+.sheet-input::placeholder { color: #636366; }
+.sheet-input:focus { background: #444446; }
+
+.sheet-input-wrap { position: relative; }
+.sheet-input-wrap .sheet-input { padding-right: 42px; }
+.sheet-eye {
+  position: absolute;
+  right: 12px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none;
+  color: #8e8e93; cursor: pointer;
+  font-size: 17px; padding: 4px;
+}
+
+.sheet-save {
+  width: 100%;
+  background: #e8774a;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 15px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  margin-top: 8px;
+  letter-spacing: -0.2px;
+}
+.sheet-save:active { opacity: 0.8; }
+
+/* ═══ PIXEL CLAUDE SVG ═══ */
+.pixel-art {
+  width: 80px; height: 60px;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ SCREEN 1: LIST ═══ -->
+<div id="screen-list">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <div class="top-bar-icon" onclick="openFilter()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="15" y2="12"/>
+        <line x1="3" y1="18" x2="9" y2="18"/>
+        <polyline points="17 10 21 14 17 18" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="top-bar-title">Code</div>
+    <div class="top-bar-icon" onclick="openFilter2()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <line x1="3" y1="5" x2="21" y2="5"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="19" x2="21" y2="19"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Sessions -->
+  <div class="sessions-scroll">
+
+    <div class="section-header">Yesterday</div>
+
+    <div class="session-card" onclick="openSession('Project readiness check','basharbhassan336699-cell/CoBWeaverClaw')">
+      <div class="session-text">
+        <div class="session-name">Project readiness check</div>
+        <div class="session-repo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/>
+            <line x1="6" y1="9" x2="6" y2="12"/><line x1="18" y1="9" x2="18" y2="12"/>
+            <line x1="6" y1="15" x2="6" y2="15"/><line x1="18" y1="15" x2="12" y2="15"/>
+          </svg>
+          /CoBWeaverC...
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:2px">
+            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/>
+          </svg>
+        </div>
+      </div>
+      <div class="session-action-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="9" stroke-dasharray="4 2"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="section-header">Last month</div>
+
+    <div class="session-card" onclick="openSession('SimCore Implementation','basharbhassan336699-cell/Repository-c...')">
+      <div class="session-text">
+        <div class="session-name">SimCore Implementation</div>
+        <div class="session-repo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/>
+            <line x1="6" y1="9" x2="6" y2="12"/><line x1="18" y1="9" x2="18" y2="12"/>
+          </svg>
+          basharbhassan336699-cell/Repository-c...
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:2px">
+            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/>
+          </svg>
+        </div>
+      </div>
+      <div class="session-action-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="9" stroke-dasharray="4 2"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FAB -->
+  <div class="fab-container">
+    <button class="fab" onclick="newSession()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      New session
+    </button>
+  </div>
+
+  <!-- Filter dropdown -->
+  <div class="filter-overlay" id="filterOverlay" onclick="closeFilter(event)">
+    <div class="filter-backdrop"></div>
+    <div class="filter-menu">
+      <div class="filter-item active" onclick="setFilter('All')">
+        <div class="filter-item-left">
+          <svg class="filter-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          All
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </div>
+      <div class="filter-item" onclick="setFilter('Working')">
+        <div class="filter-item-left">
+          <svg style="width:18px;height:18px;color:#8e8e93" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="3 1"/></svg>
+          Working
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#8e8e93"><circle cx="12" cy="12" r="10" stroke-dasharray="3 1"/></svg>
+      </div>
+      <div class="filter-item" onclick="setFilter('Needs input')">
+        <div class="filter-item-left">
+          <svg style="width:18px;height:18px;color:#8e8e93" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Needs input
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#8e8e93"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+      </div>
+      <div class="filter-item" onclick="setFilter('Ready for review')">
+        <div class="filter-item-left">
+          <svg style="width:18px;height:18px;color:#8e8e93" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><path d="M11 18H8a2 2 0 01-2-2V9"/></svg>
+          Ready for review
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#8e8e93"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><path d="M11 18H8a2 2 0 01-2-2V9"/></svg>
+      </div>
+      <div class="filter-item" onclick="setFilter('Completed')">
+        <div class="filter-item-left">
+          <svg style="width:18px;height:18px;color:#8e8e93" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Completed
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#8e8e93"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="filter-divider"></div>
+      <div class="filter-item archived" onclick="setFilter('Archived')">
+        <div class="filter-item-left">
+          <svg style="width:18px;height:18px;color:#8e8e93" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          Archived
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#8e8e93"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SCREEN 2: SESSION ═══ -->
+<div id="screen-session">
+
+  <!-- Header -->
+  <div class="session-header">
+    <div class="session-header-dots" onclick="openContextMenu()">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+      </svg>
+    </div>
+    <div class="session-header-center">
+      <div class="session-header-title" id="sessionTitle">Project readiness check</div>
+      <div class="session-header-repo" id="sessionRepo">basharbhassan336699-cell/CoBWeaverClaw</div>
+    </div>
+    <div class="session-header-pr">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/>
+        <path d="M13 6h3a2 2 0 012 2v7"/>
+        <path d="M11 18H8a2 2 0 01-2-2V9"/>
+      </svg>
+    </div>
+    <div class="session-header-arrow" onclick="goBack()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="5" y1="12" x2="19" y2="12"/>
+        <polyline points="13 6 19 12 13 18"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="session-loading">
+    <!-- Pixel art Claude (hand-drawn with SVG) -->
+    <svg class="pixel-art" viewBox="0 0 20 16" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated;width:80px;height:64px">
+      <!-- Body -->
+      <rect x="4" y="2" width="12" height="8" fill="#e8774a"/>
+      <!-- Head top -->
+      <rect x="6" y="0" width="8" height="2" fill="#e8774a"/>
+      <!-- Eyes -->
+      <rect x="7" y="3" width="2" height="2" fill="#1c1c1e"/>
+      <rect x="11" y="3" width="2" height="2" fill="#1c1c1e"/>
+      <!-- Mouth area -->
+      <rect x="8" y="6" width="4" height="1" fill="#c45e30"/>
+      <!-- Arms -->
+      <rect x="2" y="4" width="2" height="3" fill="#e8774a"/>
+      <rect x="16" y="4" width="2" height="3" fill="#e8774a"/>
+      <!-- Legs -->
+      <rect x="6" y="10" width="3" height="4" fill="#e8774a"/>
+      <rect x="11" y="10" width="3" height="4" fill="#e8774a"/>
+      <!-- Feet -->
+      <rect x="5" y="13" width="4" height="1" fill="#c45e30"/>
+      <rect x="11" y="13" width="4" height="1" fill="#c45e30"/>
+      <!-- Shadow/highlight -->
+      <rect x="4" y="2" width="1" height="8" fill="#f09070" opacity="0.4"/>
+    </svg>
+    <div class="loading-text">Loading session...</div>
+  </div>
+
+  <!-- Output area — Claude responses stream here -->
+  <div id="outputArea" style="flex:1;overflow-y:auto;padding:12px 16px;display:none;scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
+
+  <!-- Input bar — exact match screenshot -->
+  <div class="input-bar">
+    <div class="input-box">
+      <textarea class="input-textarea" id="msgInput" placeholder="Add feedback..." rows="1"
+        oninput="autoResize(this)"></textarea>
+      <div class="input-actions">
+        <div class="input-mic" onclick="toggleMic()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="9" y="2" width="6" height="11" rx="3"/>
+            <path d="M5 10a7 7 0 0014 0"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+            <line x1="9" y1="22" x2="15" y2="22"/>
+          </svg>
+        </div>
+        <button class="input-accept" onclick="acceptEdits()">
+          Accept edits <span class="input-accept-code">&lt;/&gt;</span>
+        </button>
+        <div class="input-clip" onclick="document.getElementById('fileInput').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="fileInput" style="display:none" multiple onchange="handleFiles(event)">
+    <!-- Attached files preview -->
+    <div id="attachedFiles" style="display:none; padding:8px 0 0; display:flex; flex-wrap:wrap; gap:6px;"></div>
+  </div>
+
+  <!-- Context menu -->
+  <div class="context-menu-overlay" id="contextMenuOverlay" onclick="closeContextMenu(event)">
+    <div class="context-menu">
+      <div class="context-item" onclick="copyBranch()">
+        <div class="context-item-right">
+          <div class="context-item-title">Copy branch</div>
+          <div class="context-item-sub">claude/project-readiness-3b29hi</div>
+        </div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+      </div>
+      <div class="context-item" onclick="changeModel()">
+        <div class="context-item-right">
+          <div class="context-item-title">Change model</div>
+          <div class="context-item-sub" id="currentModelLabel">Opus 4.8</div>
+        </div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+          <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+        </svg>
+      </div>
+      <div class="context-item" onclick="openApiSettings()">
+        <div class="context-item-right"><div class="context-item-title">API Settings</div></div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </div>
+      <div class="context-item">
+        <div class="context-item-right"><div class="context-item-title">Share</div></div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        </svg>
+      </div>
+      <div class="context-item">
+        <div class="context-item-right"><div class="context-item-title">Rename</div></div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </div>
+      <div class="context-item delete">
+        <div class="context-item-right"><div class="context-item-title" style="color:#ff453a">Archive</div></div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+          <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SETTINGS SHEET ═══ -->
+<div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOutside(event)">
+  <div class="settings-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">API Settings</div>
+    <div class="sheet-subtitle">Connect Claude Code to your API provider</div>
+
+    <div class="sheet-field">
+      <label class="sheet-label">Base URL</label>
+      <input class="sheet-input" id="baseUrl" type="url" placeholder="https://capi.aerolink.lat" dir="ltr">
+    </div>
+
+    <div class="sheet-field">
+      <label class="sheet-label">API Key</label>
+      <div class="sheet-input-wrap">
+        <input class="sheet-input" id="apiKey" type="password" placeholder="aero_live__xxxxxxxxxxxxxxxx" dir="ltr">
+        <button class="sheet-eye" onclick="toggleKey()" id="eyeBtn">👁</button>
+      </div>
+    </div>
+
+    <div class="sheet-field">
+      <label class="sheet-label">Model</label>
+      <input class="sheet-input" id="modelId" type="text" placeholder="claude-opus-4-6" dir="ltr">
+    </div>
+
+    <button class="sheet-save" onclick="saveSettings()">Save & Apply</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  CoBWeaverClaw — Claude Code Web Bridge Client
+// ══════════════════════════════════════════════════════════════════
+
+const API = window.location.origin;   // same host:port as the server
+
+let activeFilter    = 'All';
+let attachedFilesList = [];
+let currentSessionId  = null;
+let sseSource         = null;
+let outputBuffer      = '';
+
+// ── Init ──────────────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  loadLocalConfig();
+  await checkServerStatus();
+});
+
+// ── Server status ─────────────────────────────────────────────────
+async function checkServerStatus() {
+  try {
+    const r = await fetch(`${API}/status`);
+    const s = await r.json();
+    showToast(s.claude_available
+      ? '✅ Claude Code متاح'
+      : '⚠️ Claude Code غير موجود — ثبّته أولاً');
+  } catch (_) {
+    showToast('⚠️ السيرفر غير متصل');
+  }
+}
+
+// ── Local config ──────────────────────────────────────────────────
+function loadLocalConfig() {
+  const cfg = JSON.parse(localStorage.getItem('cbw_api_cfg') || '{}');
+  if (cfg.baseUrl) document.getElementById('baseUrl').value = cfg.baseUrl;
+  if (cfg.apiKey)  document.getElementById('apiKey').value  = cfg.apiKey;
+  if (cfg.model) {
+    document.getElementById('modelId').value = cfg.model;
+    const lbl = document.getElementById('currentModelLabel');
+    if (lbl) lbl.textContent = cfg.model;
+  }
+}
+
+// ── Navigation ────────────────────────────────────────────────────
+function openSession(title, repo, sessionId) {
+  document.getElementById('sessionTitle').textContent = title || 'جلسة جديدة';
+  document.getElementById('sessionRepo').textContent  = repo  || '';
+  document.getElementById('screen-list').style.display    = 'none';
+  document.getElementById('screen-session').style.display = 'flex';
+  clearOutput();
+  if (sessionId) connectSession(sessionId);
+}
+
+function goBack() {
+  if (sseSource) { sseSource.close(); sseSource = null; }
+  document.getElementById('screen-session').style.display = 'none';
+  document.getElementById('screen-list').style.display    = 'flex';
+}
+
+// ── New session ───────────────────────────────────────────────────
+async function newSession() {
+  const cfg = JSON.parse(localStorage.getItem('cbw_api_cfg') || '{}');
+  if (!cfg.apiKey) {
+    showToast('❌ أضف API Key أولاً من قائمة ⋯');
+    return;
+  }
+
+  showLoading(true);
+  openSession('جلسة جديدة', '');
+
+  try {
+    const r = await fetch(`${API}/session/new`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error);
+    currentSessionId = data.session_id;
+    document.getElementById('sessionTitle').textContent = 'Claude Code';
+    document.getElementById('sessionRepo').textContent  = data.session_id;
+    connectSession(data.session_id);
+    showLoading(false);
+  } catch (e) {
+    showLoading(false);
+    appendOutput('system', '❌ فشل بدء الجلسة: ' + e.message);
+  }
+}
+
+// ── SSE stream ────────────────────────────────────────────────────
+function connectSession(id) {
+  if (sseSource) sseSource.close();
+  currentSessionId = id;
+  sseSource = new EventSource(`${API}/session/${id}/stream`);
+  sseSource.onmessage = e => {
+    try {
+      const { type, data } = JSON.parse(e.data);
+      appendOutput(type, data);
+    } catch (_) {}
+  };
+  sseSource.onerror = () => {
+    appendOutput('system', '[اتصال SSE انقطع]');
+  };
+}
+
+// ── Output display ────────────────────────────────────────────────
+function clearOutput() {
+  outputBuffer = '';
+  const out = document.getElementById('outputArea');
+  if (out) out.innerHTML = '';
+}
+
+function appendOutput(type, text) {
+  showLoading(false);
+  let out = document.getElementById('outputArea');
+  if (!out) return;
+
+  const line = document.createElement('div');
+  line.style.cssText = 'font-family:SF Mono,Fira Code,monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;padding:2px 0;';
+
+  if (type === 'stderr' || type === 'system') {
+    line.style.color = type === 'system' ? '#636366' : '#ff6b6b';
+  } else {
+    line.style.color = '#e8e8e8';
+  }
+
+  line.textContent = text;
+  out.appendChild(line);
+  out.scrollTop = out.scrollHeight;
+}
+
+// ── Send input ────────────────────────────────────────────────────
+async function sendMessage() {
+  const inp = document.getElementById('msgInput');
+  const text = inp.value.trim();
+  if (!text || !currentSessionId) return;
+
+  inp.value = '';
+  inp.style.height = 'auto';
+
+  // Show files content first
+  for (const f of attachedFilesList) {
+    const content = await readFileAsText(f);
+    const msg = `[File: ${f.name}]\n${content}`;
+    await fetch(`${API}/session/${currentSessionId}/input`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: msg }),
+    });
+  }
+  attachedFilesList = [];
+  renderAttachments();
+
+  await fetch(`${API}/session/${currentSessionId}/input`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+}
+
+function readFileAsText(file) {
+  return new Promise(resolve => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.onerror = () => resolve('[Could not read file]');
+    r.readAsText(file);
+  });
+}
+
+// ── Input key handler ─────────────────────────────────────────────
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ── Accept edits ──────────────────────────────────────────────────
+async function acceptEdits() {
+  if (!currentSessionId) return;
+  await fetch(`${API}/session/${currentSessionId}/input`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: 'y' }),
+  });
+}
+
+// ── Filter ────────────────────────────────────────────────────────
+function openFilter()  { document.getElementById('filterOverlay').classList.add('open'); }
+function openFilter2() { document.getElementById('filterOverlay').classList.add('open'); }
+function closeFilter(e) {
+  if (e.target === document.getElementById('filterOverlay') ||
+      e.target.classList.contains('filter-backdrop') ||
+      e.target.closest('.filter-item'))
+    document.getElementById('filterOverlay').classList.remove('open');
+}
+function setFilter(name) {
+  activeFilter = name;
+  document.querySelectorAll('.filter-item').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('filterOverlay').classList.remove('open');
+}
+
+// ── Context menu ──────────────────────────────────────────────────
+function openContextMenu() { document.getElementById('contextMenuOverlay').classList.add('open'); }
+function closeContextMenu(e) {
+  if (e.target === document.getElementById('contextMenuOverlay'))
+    document.getElementById('contextMenuOverlay').classList.remove('open');
+}
+function copyBranch() {
+  const id = currentSessionId || '';
+  navigator.clipboard?.writeText(id);
+  document.getElementById('contextMenuOverlay').classList.remove('open');
+  showToast('✅ تم النسخ');
+}
+function changeModel() {
+  document.getElementById('contextMenuOverlay').classList.remove('open');
+  openApiSettings();
+}
+
+// ── API Settings ──────────────────────────────────────────────────
+function openApiSettings() {
+  document.getElementById('contextMenuOverlay').classList.remove('open');
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+function closeSettingsOutside(e) {
+  if (e.target === document.getElementById('settingsOverlay'))
+    document.getElementById('settingsOverlay').classList.remove('open');
+}
+function toggleKey() {
+  const inp = document.getElementById('apiKey');
+  const btn = document.getElementById('eyeBtn');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+async function saveSettings() {
+  const cfg = {
+    baseUrl: document.getElementById('baseUrl').value.trim(),
+    apiKey:  document.getElementById('apiKey').value.trim(),
+    model:   document.getElementById('modelId').value.trim() || 'claude-opus-4-6',
+  };
+  localStorage.setItem('cbw_api_cfg', JSON.stringify(cfg));
+  const lbl = document.getElementById('currentModelLabel');
+  if (lbl) lbl.textContent = cfg.model;
+
+  // Save to server .env too
+  try {
+    await fetch(`${API}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    });
+    showToast('✅ تم الحفظ');
+  } catch (_) {
+    showToast('✅ تم الحفظ محلياً');
+  }
+  document.getElementById('settingsOverlay').classList.remove('open');
+}
+
+// ── File attachment ───────────────────────────────────────────────
+function handleFiles(e) {
+  attachedFilesList = [...attachedFilesList, ...Array.from(e.target.files)];
+  renderAttachments();
+  e.target.value = '';
+}
+function renderAttachments() {
+  const el = document.getElementById('attachedFiles');
+  if (!el) return;
+  if (attachedFilesList.length === 0) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = attachedFilesList.map((f, i) => `
+    <div style="background:#3a3a3c;border-radius:8px;padding:6px 10px;font-size:12px;
+      color:#fff;display:flex;align-items:center;gap:6px;max-width:160px;">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">📎 ${f.name}</span>
+      <span onclick="removeFile(${i})" style="color:#8e8e93;cursor:pointer;font-size:15px">✕</span>
+    </div>`).join('');
+}
+function removeFile(i) { attachedFilesList.splice(i, 1); renderAttachments(); }
+
+// ── Loading state ─────────────────────────────────────────────────
+function showLoading(show) {
+  const el = document.querySelector('.session-loading');
+  if (el) el.style.display = show ? 'flex' : 'none';
+  const out = document.getElementById('outputArea');
+  if (out) out.style.display = show ? 'none' : 'block';
+}
+
+// ── Mic (placeholder) ─────────────────────────────────────────────
+function toggleMic() { showToast('🎙 قريباً'); }
+
+// ── Toast ─────────────────────────────────────────────────────────
+function showToast(msg) {
+  let t = document.getElementById('cbw-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'cbw-toast';
+    t.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(10px);background:#2c2c2e;border:1px solid #3a3a3c;color:#fff;padding:10px 20px;border-radius:30px;font-size:13px;z-index:999;opacity:0;transition:all 0.3s;white-space:nowrap;pointer-events:none;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(10px)';
+  }, 2500);
+}
+</script>
+</body>
+</html>
