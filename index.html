@@ -1,442 +1,1140 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="theme-color" content="#cb6d4f">
 <link rel="icon" type="image/png" href="/logo.png">
 <link rel="apple-touch-icon" href="/logo.png">
 <title>ClawBridge</title>
 <style>
-  :root {
-    --bg:        #14161a;
-    --bg-2:      #1b1e24;
-    --bg-3:      #232830;
-    --line:      #2c313b;
-    --text:      #e9ecf1;
-    --muted:     #9aa3b2;
-    --accent:    #cb6d4f;
-    --accent-2:  #e08a6b;
-    --user:      #2a4d6e;
-    --ok:        #4caf6a;
-    --err:       #e5595b;
-    --radius:    16px;
-    --safe-b:    env(safe-area-inset-bottom, 0px);
-    --safe-t:    env(safe-area-inset-top, 0px);
-  }
-  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { height:100%; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Arabic', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    display: flex;
-    flex-direction: column;
-    height: 100dvh;
-    overflow: hidden;
-    max-width: 720px;
-    margin: 0 auto;
-    position: relative;
-  }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
-  /* ─── Header ─── */
-  header {
-    display: flex; align-items: center; gap: 10px;
-    padding: calc(10px + var(--safe-t)) 14px 10px;
-    background: var(--bg-2);
-    border-bottom: 1px solid var(--line);
-    flex-shrink: 0;
-    z-index: 20;
-  }
-  header .logo { width: 30px; height: 30px; border-radius: 8px; flex-shrink:0; }
-  header .title { font-size: 17px; font-weight: 700; letter-spacing:.2px; }
-  header .status { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); }
-  header .dot { width:8px; height:8px; border-radius:50%; background:var(--muted); }
-  header .dot.on  { background: var(--ok); box-shadow:0 0 6px var(--ok); }
-  header .dot.off { background: var(--err); }
-  header .spacer { flex: 1; }
-  .icon-btn {
-    width: 40px; height: 40px; border:none; border-radius: 12px;
-    background: var(--bg-3); color: var(--text); font-size: 19px;
-    display:flex; align-items:center; justify-content:center; cursor:pointer;
-    transition: background .15s, transform .1s;
-  }
-  .icon-btn:active { transform: scale(.92); background: var(--line); }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  background: #1c1c1e;
+  color: #fff;
+  height: 100dvh;
+  overflow: hidden;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  position: relative;
+}
 
-  /* ─── Chat area ─── */
-  main {
-    flex: 1; overflow-y: auto; overflow-x: hidden;
-    padding: 16px 12px 8px;
-    display: flex; flex-direction: column; gap: 10px;
-    -webkit-overflow-scrolling: touch;
-  }
-  .empty {
-    margin: auto; text-align: center; color: var(--muted);
-    display:flex; flex-direction:column; align-items:center; gap:14px; padding:24px;
-  }
-  .empty img { width: 76px; height:76px; opacity:.9; }
-  .empty h2 { color: var(--text); font-size: 18px; font-weight:700; }
-  .empty p { font-size: 13.5px; line-height: 1.7; max-width: 300px; }
-  .empty .cta { color: var(--accent-2); font-weight:600; }
+/* ═══ SCREEN 1: Sessions List ═══ */
+#screen-list {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #1c1c1e;
+}
 
-  .msg { max-width: 88%; padding: 10px 13px; border-radius: var(--radius); font-size: 14.5px; line-height:1.6; word-wrap:break-word; white-space:pre-wrap; }
-  .msg.user   { align-self: flex-start; background: var(--user); border-bottom-right-radius: 5px; }
-  .msg.bot    { align-self: flex-end; background: var(--bg-2); border:1px solid var(--line); border-bottom-left-radius:5px; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size:13px; overflow-x:auto; }
-  .msg.sys    { align-self: center; background: transparent; color: var(--muted); font-size:12px; text-align:center; padding:4px 10px; border:1px dashed var(--line); border-radius:10px; }
-  .msg.err    { align-self: center; background: rgba(229,89,91,.12); color:#ffb3b4; font-size:12.5px; border:1px solid rgba(229,89,91,.3); }
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
 
-  /* ─── Composer ─── */
-  .composer {
-    flex-shrink: 0;
-    padding: 8px 10px calc(8px + var(--safe-b));
-    background: var(--bg-2);
-    border-top: 1px solid var(--line);
-  }
-  .attach-chip {
-    display:none; align-items:center; gap:8px;
-    background: var(--bg-3); border:1px solid var(--line); border-radius:10px;
-    padding:7px 10px; margin-bottom:8px; font-size:12.5px; color:var(--text);
-  }
-  .attach-chip.show { display:flex; }
-  .attach-chip .name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .attach-chip .bar { height:3px; background:var(--line); border-radius:3px; flex-basis:60px; overflow:hidden; }
-  .attach-chip .bar > i { display:block; height:100%; width:0; background:var(--accent); transition:width .2s; }
-  .attach-chip .x { color:var(--muted); font-size:16px; cursor:pointer; padding:0 2px; }
+.top-bar-icon {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
 
-  .input-row { display:flex; align-items:flex-end; gap:8px; }
-  .input-row textarea {
-    flex:1; resize:none; border:none; outline:none;
-    background: var(--bg-3); color: var(--text);
-    border-radius: 20px; padding: 11px 15px; font-size:15px; line-height:1.4;
-    max-height: 130px; min-height: 44px; font-family:inherit;
-  }
-  .input-row textarea::placeholder { color: var(--muted); }
-  .round-btn {
-    width:44px; height:44px; border:none; border-radius:50%; flex-shrink:0;
-    display:flex; align-items:center; justify-content:center; cursor:pointer;
-    transition: transform .12s, opacity .15s, background .15s;
-  }
-  .round-btn:active { transform: scale(.9); }
-  .attach-btn { background: var(--bg-3); color: var(--muted); font-size:20px; }
-  .send-btn   { background: var(--accent); color:#fff; font-size:20px;
-                transform: scale(.4); opacity:0; width:0; pointer-events:none; }
-  .composer.active .send-btn { transform: scale(1); opacity:1; width:44px; pointer-events:auto; }
+.top-bar-icon svg { width: 22px; height: 22px; color: #fff; }
 
-  /* ─── Settings sheet ─── */
-  .overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.55);
-    opacity:0; pointer-events:none; transition:opacity .2s; z-index:50;
-  }
-  .overlay.show { opacity:1; pointer-events:auto; }
-  .sheet {
-    position: fixed; left:0; right:0; bottom:0; z-index:60;
-    background: var(--bg-2); border-top-left-radius:22px; border-top-right-radius:22px;
-    border-top:1px solid var(--line);
-    padding: 8px 18px calc(22px + var(--safe-b));
-    max-width:720px; margin:0 auto;
-    transform: translateY(110%); transition: transform .28s cubic-bezier(.2,.8,.2,1);
-    max-height: 88dvh; overflow-y:auto;
-  }
-  .sheet.show { transform: translateY(0); }
-  .sheet .grip { width:40px; height:4px; background:var(--line); border-radius:3px; margin:8px auto 16px; }
-  .sheet h3 { font-size:16px; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-  .field { margin-bottom:15px; }
-  .field label { display:block; font-size:12.5px; color:var(--muted); margin-bottom:6px; }
-  .field input, .field select {
-    width:100%; background: var(--bg-3); border:1px solid var(--line); color:var(--text);
-    border-radius:12px; padding:12px 14px; font-size:14.5px; outline:none; font-family:inherit;
-  }
-  .field input:focus, .field select:focus { border-color: var(--accent); }
-  .field .pw-wrap { position:relative; }
-  .field .pw-wrap input { padding-left:44px; }
-  .field .pw-wrap .eye { position:absolute; left:8px; top:50%; transform:translateY(-50%);
-                         background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:6px; }
-  .btn {
-    width:100%; border:none; border-radius:12px; padding:13px; font-size:15px; font-weight:600;
-    cursor:pointer; font-family:inherit; transition:transform .1s, filter .15s;
-  }
-  .btn:active { transform: scale(.98); }
-  .btn.primary { background: var(--accent); color:#fff; }
-  .btn.ghost { background: var(--bg-3); color:var(--text); border:1px solid var(--line); }
-  .btn:disabled { opacity:.55; cursor:default; }
-  .row-gap { margin-bottom:12px; }
-  .hint { font-size:12px; color:var(--muted); line-height:1.7; margin-top:4px; }
-  .hint.ok  { color: var(--ok); }
-  .hint.err { color: #ffb3b4; }
-  .models-count { font-size:11.5px; color:var(--accent-2); margin-top:6px; }
+.top-bar-title {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #fff;
+}
+
+/* Sessions scroll area */
+.sessions-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0 100px;
+  scrollbar-width: none;
+}
+.sessions-scroll::-webkit-scrollbar { display: none; }
+
+.section-header {
+  padding: 20px 16px 8px;
+  font-size: 13px;
+  color: #8e8e93;
+  font-weight: 400;
+}
+
+/* Session card */
+.session-card {
+  margin: 0 12px 10px;
+  background: #2c2c2e;
+  border-radius: 16px;
+  padding: 14px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  position: relative;
+  min-height: 68px;
+}
+
+.session-card:active { opacity: 0.7; }
+
+.session-text { flex: 1; min-width: 0; }
+
+.session-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+
+.session-repo {
+  font-size: 12px;
+  color: #8e8e93;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-repo svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+/* The dashed circle button */
+.session-action-btn {
+  width: 36px; height: 36px;
+  background: #3a3a3c;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.session-action-btn svg { width: 20px; height: 20px; color: #8e8e93; }
+
+/* New session FAB */
+.fab-container {
+  position: absolute;
+  bottom: 28px;
+  left: 0; right: 0;
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 16px;
+}
+
+.fab {
+  background: #e8774a;
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  padding: 14px 22px;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  letter-spacing: -0.2px;
+}
+
+.fab svg { width: 18px; height: 18px; }
+
+/* ═══ FILTER DROPDOWN ═══ */
+.filter-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: none;
+}
+.filter-overlay.open { display: block; }
+
+.filter-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+}
+
+.filter-menu {
+  position: absolute;
+  top: 52px;
+  left: 12px;
+  background: #2c2c2e;
+  border-radius: 14px;
+  width: 220px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.filter-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  font-size: 16px;
+  color: #fff;
+  cursor: pointer;
+  border-bottom: 0.5px solid #3a3a3c;
+}
+.filter-item:last-child { border-bottom: none; }
+.filter-item:active { background: #3a3a3c; }
+
+.filter-item-left { display: flex; align-items: center; gap: 10px; }
+.filter-item svg { width: 18px; height: 18px; color: #8e8e93; }
+
+.filter-item.active { color: #4a9eff; }
+.filter-item.active .filter-check { color: #4a9eff; }
+.filter-item.active svg { color: #4a9eff; }
+
+.filter-check { width: 18px; height: 18px; }
+.filter-divider { height: 0.5px; background: #3a3a3c; }
+.filter-item.archived { border-top: 0.5px solid #3a3a3c; }
+
+/* ═══ SCREEN 2: Session View ═══ */
+#screen-session {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #1c1c1e;
+  display: none;
+}
+
+.session-header {
+  display: flex;
+  align-items: center;
+  padding: 14px 14px 10px;
+  gap: 8px;
+  border-bottom: 0.5px solid #3a3a3c;
+}
+
+.session-header-dots {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+
+.session-header-dots svg { width: 20px; height: 20px; color: #fff; }
+
+.session-header-center { flex: 1; text-align: center; min-width: 0; }
+
+.session-header-title {
+  font-size: 15px; font-weight: 600; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.session-header-repo {
+  font-size: 12px; color: #8e8e93;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.session-header-pr {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+.session-header-pr svg { width: 20px; height: 20px; color: #fff; }
+
+.session-header-arrow {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+.session-header-arrow svg { width: 20px; height: 20px; color: #fff; }
+
+/* Loading state */
+.session-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.pixel-claude {
+  width: 80px; height: 64px;
+  image-rendering: pixelated;
+  animation: walk 0.6s steps(2) infinite;
+}
+
+@keyframes walk {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+
+.loading-text {
+  font-size: 16px;
+  color: #8e8e93;
+  font-weight: 400;
+}
+
+/* Context menu */
+.context-menu-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: none;
+}
+.context-menu-overlay.open { display: block; }
+
+.context-menu {
+  position: absolute;
+  top: 52px;
+  left: 12px;
+  background: #2c2c2e;
+  border-radius: 14px;
+  width: 260px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.context-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  font-size: 16px;
+  color: #fff;
+  cursor: pointer;
+  border-bottom: 0.5px solid #3a3a3c;
+}
+.context-item:last-child { border-bottom: none; }
+.context-item:active { background: #3a3a3c; }
+.context-item.delete { color: #ff453a; }
+
+.context-item-right { text-align: right; }
+.context-item-title { font-size: 16px; color: #fff; }
+.context-item-sub { font-size: 12px; color: #8e8e93; margin-top: 2px; }
+.context-item-icon { width: 22px; height: 22px; color: #8e8e93; }
+.context-item.delete .context-item-icon { color: #ff453a; }
+
+/* Bottom input bar */
+.input-bar {
+  padding: 10px 14px 24px;
+  background: #1c1c1e;
+}
+
+.input-box {
+  background: #2c2c2e;
+  border-radius: 16px;
+  padding: 12px 16px 48px;
+  position: relative;
+}
+
+.input-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  color: #fff;
+  font-family: inherit;
+  resize: none;
+  min-height: 24px;
+  max-height: 120px;
+  line-height: 1.4;
+  padding: 0;
+  caret-color: #fff;
+}
+.input-textarea::placeholder { color: #636366; }
+
+.input-actions {
+  position: absolute;
+  bottom: 10px;
+  left: 10px; right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.input-action-left { display: flex; gap: 8px; align-items: center; }
+
+.input-mic {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.input-mic svg { width: 22px; height: 22px; color: #8e8e93; }
+
+.input-accept {
+  background: #3a3a3c;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 15px;
+  color: #fff;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  font-family: inherit;
+  border: none;
+}
+
+.input-accept-code {
+  font-size: 13px;
+  color: #8e8e93;
+}
+
+.input-clip {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.input-clip svg { width: 22px; height: 22px; color: #8e8e93; }
+
+/* ═══ SETTINGS MODAL ═══ */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.settings-overlay.open { display: flex; }
+
+.settings-sheet {
+  background: #2c2c2e;
+  border-radius: 20px 20px 0 0;
+  padding: 12px 20px 44px;
+  width: 100%;
+  max-width: 430px;
+  animation: slideUp 0.28s cubic-bezier(.25,.46,.45,.94);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: #48484a;
+  border-radius: 2px;
+  margin: 0 auto 20px;
+}
+
+.sheet-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.sheet-subtitle {
+  font-size: 14px;
+  color: #8e8e93;
+  margin-bottom: 24px;
+}
+
+.sheet-field { margin-bottom: 16px; }
+
+.sheet-label {
+  font-size: 13px;
+  color: #8e8e93;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.sheet-input {
+  width: 100%;
+  background: #3a3a3c;
+  border: none;
+  border-radius: 12px;
+  padding: 13px 14px;
+  color: #fff;
+  font-size: 15px;
+  font-family: 'SF Mono', 'Courier New', monospace;
+  outline: none;
+  direction: ltr;
+}
+.sheet-input::placeholder { color: #636366; }
+.sheet-input:focus { background: #444446; }
+
+.sheet-input-wrap { position: relative; }
+.sheet-input-wrap .sheet-input { padding-right: 42px; }
+.sheet-eye {
+  position: absolute;
+  right: 12px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none;
+  color: #8e8e93; cursor: pointer;
+  font-size: 17px; padding: 4px;
+}
+
+.sheet-save {
+  width: 100%;
+  background: #e8774a;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 15px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  margin-top: 8px;
+  letter-spacing: -0.2px;
+}
+.sheet-save:active { opacity: 0.8; }
+
+/* ═══ PIXEL CLAUDE SVG ═══ */
+.pixel-art {
+  width: 80px; height: 60px;
+}
 </style>
 </head>
 <body>
 
-  <header>
-    <img class="logo" src="/logo.png" alt="">
-    <div>
-      <div class="title">ClawBridge</div>
-      <div class="status"><span class="dot" id="dot"></span><span id="statusText">جارٍ الاتصال…</span></div>
-    </div>
-    <div class="spacer"></div>
-    <button class="icon-btn" id="newBtn" title="جلسة جديدة">＋</button>
-    <button class="icon-btn" id="setBtn" title="الإعدادات">⚙</button>
-  </header>
+<!-- ═══ SCREEN 1: LIST ═══ -->
+<div id="screen-list">
 
-  <main id="chat">
-    <div class="empty" id="empty">
-      <img src="/logo.png" alt="">
-      <h2>ابدأ محادثة جديدة</h2>
-      <p id="emptyHint">اضغط <span class="cta">＋</span> لبدء جلسة، أو اكتب رسالتك في الأسفل.</p>
+  <!-- Top bar -->
+  <div class="top-bar">
+    <div class="top-bar-icon" onclick="openFilter()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="15" y2="12"/>
+        <line x1="3" y1="18" x2="9" y2="18"/>
+        <polyline points="17 10 21 14 17 18" stroke-width="2"/>
+      </svg>
     </div>
-  </main>
-
-  <div class="composer" id="composer">
-    <div class="attach-chip" id="chip">
-      <span>📎</span>
-      <span class="name" id="chipName"></span>
-      <span class="bar"><i id="chipBar"></i></span>
-      <span class="x" id="chipX">✕</span>
+    <div class="top-bar-title">Code</div>
+    <div class="top-bar-icon" onclick="openApiSettings()" title="الإعدادات">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      </svg>
     </div>
-    <div class="input-row">
-      <button class="round-btn attach-btn" id="attachBtn" title="رفع ملف">📎</button>
-      <textarea id="input" rows="1" placeholder="اكتب رسالتك…"></textarea>
-      <button class="round-btn send-btn" id="sendBtn" title="إرسال">➤</button>
-    </div>
-    <input type="file" id="file" hidden>
   </div>
 
-  <!-- Settings -->
-  <div class="overlay" id="overlay"></div>
-  <div class="sheet" id="sheet">
-    <div class="grip"></div>
-    <h3>⚙ الإعدادات</h3>
+  <!-- Sessions -->
+  <div class="sessions-scroll" id="sessionsScroll">
+    <div id="sessionsEmpty" style="text-align:center;color:#8e8e93;padding:70px 28px;">
+      <img src="/logo.png" alt="" style="width:64px;height:64px;opacity:.85;margin-bottom:14px">
+      <div style="font-size:15px;line-height:1.9">لا توجد جلسات بعد.<br>اضغط <b style="color:#e8774a">New session</b> للبدء.</div>
+    </div>
+  </div>
 
-    <div class="field">
-      <label>عنوان المنصة (Base URL)</label>
-      <input id="baseUrl" type="url" inputmode="url" placeholder="https://api.anthropic.com  (اتركه فارغاً لـ Anthropic)">
+  <!-- FAB -->
+  <div class="fab-container">
+    <button class="fab" onclick="newSession()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      New session
+    </button>
+  </div>
+
+  <!-- Filter dropdown -->
+  <div class="filter-overlay" id="filterOverlay" onclick="closeFilter(event)">
+    <div class="filter-backdrop"></div>
+    <div class="filter-menu">
+      <div class="filter-item active" onclick="setFilter('All')">
+        <div class="filter-item-left">
+          <svg class="filter-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          All
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </div>
+      <div class="filter-item" onclick="setFilter('Working')">
+        <div class="filter-item-left">
+          <svg style="width:18px;height:18px;color:#8e8e93" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="3 1"/></svg>
+          Working
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#8e8e93"><circle cx="12" cy="12" r="10" stroke-dasharray="3 1"/></svg>
+      </div>
+      <div class="filter-item" onclick="setFilter('Needs input')">
+        <div class="filter-item-left">
+          <svg style="width:18px;height:18px;color:#8e8e93" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Needs input
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#8e8e93"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+      </div>
+      <div class="filter-item" onclick="setFilter('Ready for review')">
+        <div class="filter-item-left">
+          <svg style="width:18px;height:18px;color:#8e8e93" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><path d="M11 18H8a2 2 0 01-2-2V9"/></svg>
+          Ready for review
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#8e8e93"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><path d="M11 18H8a2 2 0 01-2-2V9"/></svg>
+      </div>
+      <div class="filter-item" onclick="setFilter('Completed')">
+        <div class="filter-item-left">
+          <svg style="width:18px;height:18px;color:#8e8e93" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          Completed
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#8e8e93"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="filter-divider"></div>
+      <div class="filter-item archived" onclick="setFilter('Archived')">
+        <div class="filter-item-left">
+          <svg style="width:18px;height:18px;color:#8e8e93" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          Archived
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:#8e8e93"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SCREEN 2: SESSION ═══ -->
+<div id="screen-session">
+
+  <!-- Header -->
+  <div class="session-header">
+    <div class="session-header-dots" onclick="openContextMenu()">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+      </svg>
+    </div>
+    <div class="session-header-center">
+      <div class="session-header-title" id="sessionTitle">الجلسة</div>
+      <div class="session-header-repo" id="sessionRepo"></div>
+    </div>
+    <div class="session-header-pr">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/>
+        <path d="M13 6h3a2 2 0 012 2v7"/>
+        <path d="M11 18H8a2 2 0 01-2-2V9"/>
+      </svg>
+    </div>
+    <div class="session-header-arrow" onclick="goBack()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="5" y1="12" x2="19" y2="12"/>
+        <polyline points="13 6 19 12 13 18"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="session-loading">
+    <!-- Pixel art Claude (hand-drawn with SVG) -->
+    <svg class="pixel-art" viewBox="0 0 20 16" xmlns="http://www.w3.org/2000/svg" style="image-rendering:pixelated;width:80px;height:64px">
+      <!-- Body -->
+      <rect x="4" y="2" width="12" height="8" fill="#e8774a"/>
+      <!-- Head top -->
+      <rect x="6" y="0" width="8" height="2" fill="#e8774a"/>
+      <!-- Eyes -->
+      <rect x="7" y="3" width="2" height="2" fill="#1c1c1e"/>
+      <rect x="11" y="3" width="2" height="2" fill="#1c1c1e"/>
+      <!-- Mouth area -->
+      <rect x="8" y="6" width="4" height="1" fill="#c45e30"/>
+      <!-- Arms -->
+      <rect x="2" y="4" width="2" height="3" fill="#e8774a"/>
+      <rect x="16" y="4" width="2" height="3" fill="#e8774a"/>
+      <!-- Legs -->
+      <rect x="6" y="10" width="3" height="4" fill="#e8774a"/>
+      <rect x="11" y="10" width="3" height="4" fill="#e8774a"/>
+      <!-- Feet -->
+      <rect x="5" y="13" width="4" height="1" fill="#c45e30"/>
+      <rect x="11" y="13" width="4" height="1" fill="#c45e30"/>
+      <!-- Shadow/highlight -->
+      <rect x="4" y="2" width="1" height="8" fill="#f09070" opacity="0.4"/>
+    </svg>
+    <div class="loading-text">Loading session...</div>
+  </div>
+
+  <!-- Output area — Claude responses stream here -->
+  <div id="outputArea" style="flex:1;overflow-y:auto;padding:12px 16px;display:none;scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
+
+  <!-- Input bar — exact match screenshot -->
+  <div class="input-bar">
+    <div class="input-box">
+      <textarea class="input-textarea" id="msgInput" placeholder="اكتب رسالتك…" rows="1"
+        oninput="onMsgInput(this)" onkeydown="handleKey(event)"></textarea>
+      <div class="input-actions">
+        <button class="input-accept" onclick="acceptEdits()">
+          Accept edits <span class="input-accept-code">&lt;/&gt;</span>
+        </button>
+        <div class="input-clip" onclick="document.getElementById('fileInput').click()" title="رفع ملف (حتى 300MB)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </div>
+        <div class="input-send" id="sendBtn" onclick="sendMessage()" title="إرسال"
+          style="display:none;width:36px;height:36px;border-radius:50%;background:#e8774a;color:#fff;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:18px;height:18px">
+            <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="fileInput" style="display:none" multiple onchange="handleFiles(event)">
+    <!-- Attached files preview -->
+    <div id="attachedFiles" style="display:none; padding:8px 0 0; display:flex; flex-wrap:wrap; gap:6px;"></div>
+  </div>
+
+  <!-- Context menu -->
+  <div class="context-menu-overlay" id="contextMenuOverlay" onclick="closeContextMenu(event)">
+    <div class="context-menu">
+      <div class="context-item" onclick="copyBranch()">
+        <div class="context-item-right">
+          <div class="context-item-title">Copy session id</div>
+          <div class="context-item-sub" id="branchSub">—</div>
+        </div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+      </div>
+      <div class="context-item" onclick="changeModel()">
+        <div class="context-item-right">
+          <div class="context-item-title">Change model</div>
+          <div class="context-item-sub" id="currentModelLabel">Opus 4.8</div>
+        </div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+          <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+        </svg>
+      </div>
+      <div class="context-item" onclick="openApiSettings()">
+        <div class="context-item-right"><div class="context-item-title">API Settings</div></div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </div>
+      <div class="context-item">
+        <div class="context-item-right"><div class="context-item-title">Share</div></div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        </svg>
+      </div>
+      <div class="context-item">
+        <div class="context-item-right"><div class="context-item-title">Rename</div></div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </div>
+      <div class="context-item delete">
+        <div class="context-item-right"><div class="context-item-title" style="color:#ff453a">Archive</div></div>
+        <svg class="context-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+          <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ SETTINGS SHEET ═══ -->
+<div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOutside(event)">
+  <div class="settings-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">API Settings</div>
+    <div class="sheet-subtitle">Connect Claude Code to your API provider</div>
+
+    <div class="sheet-field">
+      <label class="sheet-label">Base URL</label>
+      <input class="sheet-input" id="baseUrl" type="url" placeholder="https://capi.aerolink.lat" dir="ltr">
     </div>
 
-    <div class="field">
-      <label>مفتاح API</label>
-      <div class="pw-wrap">
-        <input id="apiKey" type="password" placeholder="sk-...">
-        <button class="eye" id="eye" type="button">👁</button>
+    <div class="sheet-field">
+      <label class="sheet-label">API Key</label>
+      <div class="sheet-input-wrap">
+        <input class="sheet-input" id="apiKey" type="password" placeholder="aero_live__xxxxxxxxxxxxxxxx" dir="ltr">
+        <button class="sheet-eye" onclick="toggleKey()" id="eyeBtn">👁</button>
       </div>
     </div>
 
-    <button class="btn ghost row-gap" id="fetchModels">🔍 جلب النماذج المتوفرة</button>
-    <div class="models-count" id="modelsCount"></div>
-
-    <div class="field">
-      <label>النموذج (Model)</label>
-      <select id="model"><option value="">— اختر بعد جلب النماذج —</option></select>
+    <div class="sheet-field">
+      <button id="fetchModelsBtn" type="button" onclick="fetchModels()"
+        style="width:100%;background:#2c2c2e;border:1px solid #3a3a3c;color:#fff;border-radius:12px;padding:12px;font-size:14px;font-family:inherit;cursor:pointer;">🔍 جلب النماذج المتوفرة</button>
+      <div id="modelsCount" style="font-size:11.5px;color:#e8a07a;margin-top:6px;min-height:14px"></div>
     </div>
 
-    <button class="btn primary" id="saveBtn">حفظ</button>
-    <div class="hint" id="setHint">يُحفظ المفتاح والمنصة على هذا الجهاز فقط.</div>
+    <div class="sheet-field">
+      <label class="sheet-label">Model</label>
+      <select class="sheet-input" id="modelSelect" dir="ltr" style="display:none;margin-bottom:8px"
+        onchange="document.getElementById('modelId').value=this.value"></select>
+      <input class="sheet-input" id="modelId" type="text" placeholder="claude-opus-4-6" dir="ltr">
+    </div>
+
+    <button class="sheet-save" onclick="saveSettings()">Save & Apply</button>
   </div>
+</div>
 
 <script>
-const API = '';
-let currentSessionId = null;
-let es = null;
-let attached = null; // {path,name}
+// ══════════════════════════════════════════════════════════════════
+//  CoBWeaverClaw — Claude Code Web Bridge Client
+// ══════════════════════════════════════════════════════════════════
 
-const $ = id => document.getElementById(id);
-const chat = $('chat'), empty = $('empty'), composer = $('composer'), input = $('input');
+const API = window.location.origin;   // same host:port as the server
 
-// ── helpers ──
-const stripAnsi = s => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').replace(/\x1b\][^\x07]*\x07/g,'');
-function scrollDown(){ chat.scrollTop = chat.scrollHeight; }
-function hideEmpty(){ if(empty) empty.style.display='none'; }
+let activeFilter    = 'All';
+let attachedFilesList = [];
+let currentSessionId  = null;
+let sseSource         = null;
+let outputBuffer      = '';
 
-function addMsg(text, cls){
-  hideEmpty();
-  const d = document.createElement('div');
-  d.className = 'msg ' + cls;
-  d.textContent = text;
-  chat.appendChild(d);
-  scrollDown();
-  return d;
-}
-let botBuf = null;
-function addBotChunk(text){
-  hideEmpty();
-  if(!botBuf){ botBuf = document.createElement('div'); botBuf.className='msg bot'; chat.appendChild(botBuf); }
-  botBuf.textContent += text;
-  scrollDown();
-}
-function endBot(){ botBuf = null; }
-
-// ── config persistence ──
-function loadCfg(){
-  try { return JSON.parse(localStorage.getItem('clawbridge_cfg')||'{}'); } catch(e){ return {}; }
-}
-function saveCfgLocal(c){ localStorage.setItem('clawbridge_cfg', JSON.stringify(c)); }
-
-// ── status ──
-async function refreshStatus(){
-  try {
-    const r = await fetch(API+'/status'); const j = await r.json();
-    $('dot').className = 'dot on';
-    $('statusText').textContent = j.api_key_set ? 'جاهز' : 'المفتاح غير مضبوط';
-    if(!j.api_key_set){ $('emptyHint').innerHTML = 'اضبط <span class="cta">مفتاح API</span> من ⚙ الإعدادات لبدء المحادثة.'; }
-  } catch(e){
-    $('dot').className = 'dot off';
-    $('statusText').textContent = 'غير متصل';
-  }
-}
-
-// ── session ──
-async function ensureSession(){
-  if(currentSessionId) return currentSessionId;
-  const cfg = loadCfg();
-  const r = await fetch(API+'/session/new', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(cfg)
-  });
-  const j = await r.json();
-  if(!j.ok){ addMsg(j.error || 'تعذّر بدء الجلسة', 'err'); return null; }
-  currentSessionId = j.session_id;
-  openStream(currentSessionId);
-  addMsg('— بدأت جلسة جديدة —', 'sys');
-  return currentSessionId;
-}
-function openStream(id){
-  if(es) es.close();
-  es = new EventSource(API+'/session/'+id+'/stream');
-  es.onmessage = ev => {
-    let e; try { e = JSON.parse(ev.data); } catch(_) { return; }
-    const txt = stripAnsi(e.data || '');
-    if(e.type === 'stdout' || e.type === 'stderr'){ addBotChunk(txt); }
-    else if(e.type === 'system'){ endBot(); addMsg(txt.trim(), 'sys'); }
-  };
-  es.onerror = () => { $('dot').className='dot off'; $('statusText').textContent='انقطع البث'; };
-}
-function newSession(){
-  if(es) es.close();
-  currentSessionId = null; endBot();
-  chat.querySelectorAll('.msg').forEach(m=>m.remove());
-  empty.style.display='';
-  ensureSession();
-}
-
-// ── send ──
-async function send(){
-  let text = input.value.trim();
-  if(!text && !attached) return;
-  if(attached){
-    text = (text ? text + '\n' : '') + 'الملف المرفق موجود على المسار: ' + attached.path;
-  }
-  const sid = await ensureSession();
-  if(!sid) return;
-  addMsg(input.value.trim() + (attached ? '\n📎 '+attached.name : ''), 'user');
-  input.value=''; autoGrow(); clearAttach();
-  updateSendBtn();
-  try {
-    await fetch(API+'/session/'+sid+'/input', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ text })
-    });
-  } catch(e){ addMsg('فشل الإرسال: '+e.message, 'err'); }
-}
-
-// ── upload (up to 300MB, any type) ──
-function pickFile(){ $('file').click(); }
-$('file').addEventListener('change', e => {
-  const f = e.target.files[0]; if(!f) return;
-  if(f.size > 300*1024*1024){ addMsg('الملف أكبر من 300MB', 'err'); e.target.value=''; return; }
-  uploadFile(f);
-  e.target.value='';
+// ── Init ──────────────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  loadLocalConfig();
+  await checkServerStatus();
 });
-function uploadFile(f){
-  attached = null;
-  $('chip').classList.add('show');
-  $('chipName').textContent = f.name + ' (' + fmtSize(f.size) + ')';
-  $('chipBar').style.width = '0%';
+
+// ── Server status ─────────────────────────────────────────────────
+async function checkServerStatus() {
+  try {
+    const r = await fetch(`${API}/status`);
+    const s = await r.json();
+    showToast(s.claude_available
+      ? '✅ Claude Code متاح'
+      : '⚠️ Claude Code غير موجود — ثبّته أولاً');
+  } catch (_) {
+    showToast('⚠️ السيرفر غير متصل');
+  }
+}
+
+// ── Local config ──────────────────────────────────────────────────
+function loadLocalConfig() {
+  const cfg = JSON.parse(localStorage.getItem('cbw_api_cfg') || '{}');
+  if (cfg.baseUrl) document.getElementById('baseUrl').value = cfg.baseUrl;
+  if (cfg.apiKey)  document.getElementById('apiKey').value  = cfg.apiKey;
+  if (cfg.model) {
+    document.getElementById('modelId').value = cfg.model;
+    const lbl = document.getElementById('currentModelLabel');
+    if (lbl) lbl.textContent = cfg.model;
+  }
+}
+
+// ── Navigation ────────────────────────────────────────────────────
+function openSession(title, repo, sessionId) {
+  document.getElementById('sessionTitle').textContent = title || 'جلسة جديدة';
+  document.getElementById('sessionRepo').textContent  = repo  || '';
+  document.getElementById('screen-list').style.display    = 'none';
+  document.getElementById('screen-session').style.display = 'flex';
+  clearOutput();
+  if (sessionId) connectSession(sessionId);
+}
+
+function goBack() {
+  if (sseSource) { sseSource.close(); sseSource = null; }
+  document.getElementById('screen-session').style.display = 'none';
+  document.getElementById('screen-list').style.display    = 'flex';
+}
+
+// ── New session ───────────────────────────────────────────────────
+async function newSession() {
+  const cfg = JSON.parse(localStorage.getItem('cbw_api_cfg') || '{}');
+  if (!cfg.apiKey) {
+    showToast('❌ أضف API Key أولاً من قائمة ⋯');
+    return;
+  }
+
+  showLoading(true);
+  openSession('جلسة جديدة', '');
+
+  try {
+    const r = await fetch(`${API}/session/new`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    });
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error);
+    currentSessionId = data.session_id;
+    document.getElementById('sessionTitle').textContent = 'Claude Code';
+    document.getElementById('sessionRepo').textContent  = data.session_id;
+    connectSession(data.session_id);
+    showLoading(false);
+  } catch (e) {
+    showLoading(false);
+    appendOutput('system', '❌ فشل بدء الجلسة: ' + e.message);
+  }
+}
+
+// ── SSE stream ────────────────────────────────────────────────────
+function connectSession(id) {
+  if (sseSource) sseSource.close();
+  currentSessionId = id;
+  sseSource = new EventSource(`${API}/session/${id}/stream`);
+  sseSource.onmessage = e => {
+    try {
+      const { type, data } = JSON.parse(e.data);
+      appendOutput(type, data);
+    } catch (_) {}
+  };
+  sseSource.onerror = () => {
+    appendOutput('system', '[اتصال SSE انقطع]');
+  };
+}
+
+// ── Output display ────────────────────────────────────────────────
+function clearOutput() {
+  outputBuffer = '';
+  const out = document.getElementById('outputArea');
+  if (out) out.innerHTML = '';
+}
+
+function appendOutput(type, text) {
+  showLoading(false);
+  let out = document.getElementById('outputArea');
+  if (!out) return;
+
+  const line = document.createElement('div');
+  line.style.cssText = 'font-family:SF Mono,Fira Code,monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;padding:2px 0;';
+
+  if (type === 'stderr' || type === 'system') {
+    line.style.color = type === 'system' ? '#636366' : '#ff6b6b';
+  } else {
+    line.style.color = '#e8e8e8';
+  }
+
+  line.textContent = text;
+  out.appendChild(line);
+  out.scrollTop = out.scrollHeight;
+}
+
+// ── Send input ────────────────────────────────────────────────────
+async function sendMessage() {
+  const inp = document.getElementById('msgInput');
+  let text = inp.value.trim();
+  const ready = attachedFilesList.filter(f => f.path);
+  const stillUploading = attachedFilesList.some(f => f.uploading);
+  if (!text && ready.length === 0) return;
+  if (stillUploading) { showToast('⏳ انتظر انتهاء رفع الملف'); return; }
+
+  if (!currentSessionId) { await newSession(); if (!currentSessionId) return; }
+
+  if (ready.length) {
+    const paths = ready.map(f => 'الملف المرفق على الجهاز: ' + f.path).join('\n');
+    text = text ? (text + '\n' + paths) : paths;
+  }
+
+  inp.value = '';
+  inp.style.height = 'auto';
+  attachedFilesList = [];
+  renderAttachments();
   updateSendBtn();
+
+  await fetch(`${API}/session/${currentSessionId}/input`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+}
+
+// ── Input UX: show send button while typing ───────────────────────
+function onMsgInput(el) { autoResize(el); updateSendBtn(); }
+function updateSendBtn() {
+  const has = document.getElementById('msgInput').value.trim().length > 0
+    || attachedFilesList.length > 0;
+  const b = document.getElementById('sendBtn');
+  if (b) b.style.display = has ? 'flex' : 'none';
+}
+
+// ── Model discovery ───────────────────────────────────────────────
+async function fetchModels() {
+  const baseUrl = document.getElementById('baseUrl').value.trim();
+  const apiKey  = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { showToast('❌ أدخل المفتاح أولاً'); return; }
+  const btn = document.getElementById('fetchModelsBtn');
+  const old = btn.textContent; btn.disabled = true; btn.textContent = '… جارٍ الجلب';
+  document.getElementById('modelsCount').textContent = '';
+  try {
+    const r = await fetch(`${API}/models`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseUrl, apiKey }),
+    });
+    const j = await r.json();
+    if (j.ok && j.models.length) {
+      const sel = document.getElementById('modelSelect');
+      sel.innerHTML = j.models.map(m => `<option value="${m}">${m}</option>`).join('');
+      sel.style.display = 'block';
+      document.getElementById('modelsCount').textContent = '✓ ' + j.models.length + ' نموذج متاح';
+      const cur = document.getElementById('modelId').value.trim();
+      if (cur && j.models.includes(cur)) sel.value = cur;
+      else document.getElementById('modelId').value = sel.value;
+    } else {
+      showToast(j.error || 'لم يتم العثور على نماذج');
+    }
+  } catch (_) { showToast('تعذّر الاتصال بالمنصة'); }
+  btn.disabled = false; btn.textContent = old;
+}
+
+// ── Input key handler ─────────────────────────────────────────────
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ── Accept edits ──────────────────────────────────────────────────
+async function acceptEdits() {
+  if (!currentSessionId) return;
+  await fetch(`${API}/session/${currentSessionId}/input`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: 'y' }),
+  });
+}
+
+// ── Filter ────────────────────────────────────────────────────────
+function openFilter()  { document.getElementById('filterOverlay').classList.add('open'); }
+function openFilter2() { document.getElementById('filterOverlay').classList.add('open'); }
+function closeFilter(e) {
+  if (e.target === document.getElementById('filterOverlay') ||
+      e.target.classList.contains('filter-backdrop') ||
+      e.target.closest('.filter-item'))
+    document.getElementById('filterOverlay').classList.remove('open');
+}
+function setFilter(name) {
+  activeFilter = name;
+  document.querySelectorAll('.filter-item').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('filterOverlay').classList.remove('open');
+}
+
+// ── Context menu ──────────────────────────────────────────────────
+function openContextMenu() { document.getElementById('contextMenuOverlay').classList.add('open'); }
+function closeContextMenu(e) {
+  if (e.target === document.getElementById('contextMenuOverlay'))
+    document.getElementById('contextMenuOverlay').classList.remove('open');
+}
+function copyBranch() {
+  const id = currentSessionId || '';
+  navigator.clipboard?.writeText(id);
+  document.getElementById('contextMenuOverlay').classList.remove('open');
+  showToast('✅ تم النسخ');
+}
+function changeModel() {
+  document.getElementById('contextMenuOverlay').classList.remove('open');
+  openApiSettings();
+}
+
+// ── API Settings ──────────────────────────────────────────────────
+function openApiSettings() {
+  document.getElementById('contextMenuOverlay').classList.remove('open');
+  document.getElementById('settingsOverlay').classList.add('open');
+}
+function closeSettingsOutside(e) {
+  if (e.target === document.getElementById('settingsOverlay'))
+    document.getElementById('settingsOverlay').classList.remove('open');
+}
+function toggleKey() {
+  const inp = document.getElementById('apiKey');
+  const btn = document.getElementById('eyeBtn');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+async function saveSettings() {
+  const cfg = {
+    baseUrl: document.getElementById('baseUrl').value.trim(),
+    apiKey:  document.getElementById('apiKey').value.trim(),
+    model:   document.getElementById('modelId').value.trim() || 'claude-opus-4-6',
+  };
+  localStorage.setItem('cbw_api_cfg', JSON.stringify(cfg));
+  const lbl = document.getElementById('currentModelLabel');
+  if (lbl) lbl.textContent = cfg.model;
+
+  // Save to server .env too
+  try {
+    await fetch(`${API}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    });
+    showToast('✅ تم الحفظ');
+  } catch (_) {
+    showToast('✅ تم الحفظ محلياً');
+  }
+  document.getElementById('settingsOverlay').classList.remove('open');
+}
+
+// ── File attachment (any type, up to 300MB, streamed to server) ───
+const MAX_UPLOAD = 300 * 1024 * 1024;
+function handleFiles(e) {
+  for (const f of Array.from(e.target.files)) {
+    if (f.size > MAX_UPLOAD) { showToast('❌ ' + f.name + ' أكبر من 300MB'); continue; }
+    uploadFile(f);
+  }
+  e.target.value = '';
+}
+function uploadFile(f) {
+  const item = { name: f.name, size: f.size, path: null, progress: 0, uploading: true };
+  attachedFilesList.push(item);
+  renderAttachments(); updateSendBtn();
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', API+'/upload?name='+encodeURIComponent(f.name));
+  xhr.open('POST', `${API}/upload?name=` + encodeURIComponent(f.name));
   xhr.upload.onprogress = ev => {
-    if(ev.lengthComputable) $('chipBar').style.width = Math.round(ev.loaded/ev.total*100)+'%';
+    if (ev.lengthComputable) { item.progress = Math.round(ev.loaded / ev.total * 100); renderAttachments(); }
   };
   xhr.onload = () => {
     try {
       const j = JSON.parse(xhr.responseText);
-      if(j.ok){ attached = {path:j.path, name:j.name}; $('chipBar').style.width='100%'; }
-      else { addMsg(j.error||'فشل الرفع','err'); clearAttach(); }
-    } catch(_){ addMsg('فشل الرفع','err'); clearAttach(); }
-    updateSendBtn();
+      if (j.ok) { item.path = j.path; item.uploading = false; item.progress = 100; }
+      else { showToast(j.error || 'فشل الرفع'); removeItem(item); }
+    } catch (_) { showToast('فشل الرفع'); removeItem(item); }
+    renderAttachments(); updateSendBtn();
   };
-  xhr.onerror = () => { addMsg('فشل الرفع — تحقق من الاتصال','err'); clearAttach(); };
+  xhr.onerror = () => { showToast('فشل الرفع — تحقق من الاتصال'); removeItem(item); renderAttachments(); updateSendBtn(); };
   xhr.send(f);
 }
-function clearAttach(){ attached=null; $('chip').classList.remove('show'); updateSendBtn(); }
-function fmtSize(b){ if(b<1024) return b+'B'; if(b<1048576) return (b/1024).toFixed(0)+'KB'; return (b/1048576).toFixed(1)+'MB'; }
+function removeItem(it) { const i = attachedFilesList.indexOf(it); if (i >= 0) attachedFilesList.splice(i, 1); }
+function fmtSize(b) { if (b < 1024) return b + 'B'; if (b < 1048576) return (b/1024).toFixed(0) + 'KB'; return (b/1048576).toFixed(1) + 'MB'; }
+function renderAttachments() {
+  const el = document.getElementById('attachedFiles');
+  if (!el) return;
+  if (attachedFilesList.length === 0) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = attachedFilesList.map((f, i) => `
+    <div style="background:#3a3a3c;border-radius:8px;padding:6px 10px;font-size:12px;
+      color:#fff;display:flex;align-items:center;gap:6px;max-width:210px;">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">📎 ${f.name}${f.uploading ? ` (${f.progress}%)` : ` · ${fmtSize(f.size)}`}</span>
+      <span onclick="removeFile(${i})" style="color:#8e8e93;cursor:pointer;font-size:15px">✕</span>
+    </div>`).join('');
+}
+function removeFile(i) { attachedFilesList.splice(i, 1); renderAttachments(); updateSendBtn(); }
 
-// ── models discovery ──
-async function fetchModels(){
-  const baseUrl = $('baseUrl').value.trim();
-  const apiKey  = $('apiKey').value.trim();
-  if(!apiKey){ setHint('أدخل المفتاح أولاً', 'err'); return; }
-  const btn = $('fetchModels'); btn.disabled = true; const old = btn.textContent;
-  btn.textContent = '… جارٍ الجلب';
-  $('modelsCount').textContent = '';
-  try {
-    const r = await fetch(API+'/models', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ baseUrl, apiKey })
-    });
-    const j = await r.json();
-    if(j.ok && j.models.length){
-      const sel = $('model'); sel.innerHTML='';
-      j.models.forEach(m => { const o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o); });
-      $('modelsCount').textContent = '✓ تم العثور على '+j.models.length+' نموذج';
-      const saved = loadCfg().model; if(saved && j.models.includes(saved)) sel.value = saved;
-    } else {
-      setHint(j.error || 'لم يتم العثور على نماذج', 'err');
-    }
-  } catch(e){ setHint('تعذّر الاتصال بالمنصة', 'err'); }
-  btn.disabled=false; btn.textContent = old;
+// ── Loading state ─────────────────────────────────────────────────
+function showLoading(show) {
+  const el = document.querySelector('.session-loading');
+  if (el) el.style.display = show ? 'flex' : 'none';
+  const out = document.getElementById('outputArea');
+  if (out) out.style.display = show ? 'none' : 'block';
 }
 
-// ── settings sheet ──
-function openSheet(){
-  const c = loadCfg();
-  $('baseUrl').value = c.baseUrl||''; $('apiKey').value = c.apiKey||'';
-  if(c.model){ const s=$('model'); if(![...s.options].some(o=>o.value===c.model)){ const o=document.createElement('option'); o.value=c.model;o.textContent=c.model;s.appendChild(o);} s.value=c.model; }
-  $('overlay').classList.add('show'); $('sheet').classList.add('show');
+// ── Mic (placeholder) ─────────────────────────────────────────────
+function toggleMic() { showToast('🎙 قريباً'); }
+
+// ── Toast ─────────────────────────────────────────────────────────
+function showToast(msg) {
+  let t = document.getElementById('cbw-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'cbw-toast';
+    t.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(10px);background:#2c2c2e;border:1px solid #3a3a3c;color:#fff;padding:10px 20px;border-radius:30px;font-size:13px;z-index:999;opacity:0;transition:all 0.3s;white-space:nowrap;pointer-events:none;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(10px)';
+  }, 2500);
 }
-function closeSheet(){ $('overlay').classList.remove('show'); $('sheet').classList.remove('show'); }
-function setHint(t, cls){ const h=$('setHint'); h.textContent=t; h.className='hint '+(cls||''); }
-
-async function saveCfg(){
-  const cfg = { baseUrl:$('baseUrl').value.trim(), apiKey:$('apiKey').value.trim(), model:$('model').value };
-  saveCfgLocal(cfg);
-  try {
-    await fetch(API+'/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cfg) });
-    setHint('✓ تم الحفظ', 'ok');
-    refreshStatus();
-    setTimeout(closeSheet, 500);
-  } catch(e){ setHint('تعذّر الحفظ على الخادم', 'err'); }
-}
-
-// ── input UX ──
-function autoGrow(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,130)+'px'; }
-function updateSendBtn(){ composer.classList.toggle('active', !!input.value.trim() || !!attached); }
-input.addEventListener('input', ()=>{ autoGrow(); updateSendBtn(); });
-input.addEventListener('keydown', e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
-
-// ── wire up ──
-$('sendBtn').onclick = send;
-$('attachBtn').onclick = pickFile;
-$('chipX').onclick = clearAttach;
-$('newBtn').onclick = newSession;
-$('setBtn').onclick = openSheet;
-$('overlay').onclick = closeSheet;
-$('fetchModels').onclick = fetchModels;
-$('saveBtn').onclick = saveCfg;
-$('eye').onclick = () => { const i=$('apiKey'); i.type = i.type==='password'?'text':'password'; };
-
-refreshStatus();
-setInterval(refreshStatus, 15000);
 </script>
 </body>
 </html>
