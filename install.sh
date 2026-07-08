@@ -41,7 +41,7 @@ echo ""
 # ── Step 2: تحديث الحزم الأساسية ─────────────────────────────────
 info "تحديث الحزم..."
 pkg update -y -q 2>/dev/null || true
-pkg install -y -q nodejs curl git wget 2>/dev/null || fail "فشل تثبيت المتطلبات"
+pkg install -y -q nodejs curl git wget aria2 2>/dev/null || fail "فشل تثبيت المتطلبات"
 ok "المتطلبات الأساسية جاهزة"
 
 # ── Step 3: تثبيت Claude Code ─────────────────────────────────────
@@ -67,11 +67,15 @@ else
   done
   [ "$dl_ok" = 1 ] || fail "فشل تنزيل سكريبت التثبيت بعد 10 محاولات — تحقق من الاتصال"
 
-  # ── ترقيع تنزيل الملف الكبير (233MB) ليصبح قابلاً للاستئناف ──────
-  # السكربت الأصلي ينزّل ثنائي Claude Code بأمر curl واحد بلا استئناف
-  # (--max-time 300)، فيفشل كلياً عند أي انقطاع. نستبدله بدالة تستخدم
-  # wget -c مع 10 محاولات. تحقّق الـ checksum في السكربت الأصلي يبقى
-  # كما هو ويضمن سلامة الملف النهائي حتى بعد الاستئناف.
+  # ── حلّ جذري لتنزيل الملف الكبير (233MB) ───────────────────────────
+  # السكربت الأصلي:
+  #   • ينزّل الثنائي بأمر curl واحد بلا استئناف (--max-time 300) → يفشل
+  #     كلياً عند أي انقطاع.
+  #   • يجلب الـ manifest بـ --max-time 10 (مهلة قصيرة) → يفشل بـ
+  #     "could not read checksum" على اتصال غير مستقر.
+  # نرقّعه ليستخدم aria2c (تنزيل مجزّأ 16 وصلة + شريط تقدّم % + استئناف)،
+  # ونطيل مهل جلب الـ manifest/الإصدار مع إعادة محاولة. تحقّق الـ
+  # checksum الأصلي يبقى كما هو ويضمن سلامة الملف النهائي.
   if node -e '
     const fs = require("fs"), f = process.argv[1];
     let s = fs.readFileSync(f, "utf8");
@@ -79,9 +83,14 @@ else
     if (!s.includes(marker)) process.exit(3);
     const helper = [
       "_cbw_dl_binary() {",
-      "  local url=\"$1\" out=\"$2\" a",
+      "  local url=\"$1\" out=\"$2\" a dir base",
+      "  dir=\"$(dirname \"$out\")\"; base=\"$(basename \"$out\")\"",
+      "  if command -v aria2c >/dev/null 2>&1; then",
+      "    aria2c -c -x 16 -s 16 -k 1M --file-allocation=none --max-tries=10 --retry-wait=5 --summary-interval=1 --console-log-level=warn -d \"$dir\" -o \"$base\" \"$url\" && return 0",
+      "    return 1",
+      "  fi",
       "  for a in 1 2 3 4 5 6 7 8 9 10; do",
-      "    wget -c -q --tries=1 --timeout=60 -O \"$out\" \"$url\" && return 0",
+      "    wget -c -q --show-progress --tries=1 --timeout=60 -O \"$out\" \"$url\" && return 0",
       "    printf \"[!] binary download attempt %s/10 failed, resuming...\\n\" \"$a\" >&2",
       "    sleep $(( a < 6 ? a * 3 : 15 ))",
       "  done",
@@ -91,9 +100,11 @@ else
     ].join("\n");
     const call = `_cbw_dl_binary "$DL_BASE/linux-arm64/claude" "$BINARY.tmp"`;
     s = s.replace(marker, () => helper + call);
+    // مهل أطول + إعادة محاولة لجلب الـ manifest والإصدار (كانت --max-time 10)
+    s = s.split("--max-time 10 ").join("--retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 30 --max-time 120 ");
     fs.writeFileSync(f, s);
   ' "$INSTALL_SCRIPT" 2>/dev/null; then
-    ok "تم تفعيل التنزيل القابل للاستئناف للملف الكبير (233MB)"
+    ok "تم تفعيل التنزيل المجزّأ (aria2c) مع شريط تقدّم واستئناف تلقائي"
   else
     warn "تعذّر ترقيع سطر التنزيل (ربما تغيّر السكربت الأصلي) — سيُستخدم كما هو"
   fi
