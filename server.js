@@ -316,6 +316,13 @@ function router(req, res) {
         if (cfg.apiKey)  lines.push(`ANTHROPIC_API_KEY=${cfg.apiKey}`);
         if (cfg.model)   lines.push(`ANTHROPIC_MODEL=${cfg.model}`);
         fs.writeFileSync(CFG_FILE, lines.join('\n') + '\n');
+        // Apply to live sessions so a changed key/model/platform takes effect
+        // immediately, without needing to start a new session.
+        Object.values(sessions).forEach(s => {
+          s.cfg.baseUrl = cfg.baseUrl || '';
+          s.cfg.apiKey  = cfg.apiKey  || '';
+          s.cfg.model   = cfg.model   || '';
+        });
         log('Config saved to ' + CFG_FILE);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, message: 'Config saved' }));
