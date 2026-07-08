@@ -41,11 +41,13 @@ Open in browser:
 
 ## Features
 
-- Mobile-first UI
+- Clean, responsive mobile-first UI (RTL-ready)
 - Real-time streaming (SSE)
-- File upload
-- Multi-session
-- API config (Base URL + Key + Model)
+- Send button that appears as you type
+- File upload — any type, up to 300 MB
+- Configure any platform (Base URL + API key)
+- Model discovery — list the models available on your platform
+- Works with Anthropic and OpenAI-compatible endpoints (OpenRouter, Aerolink, …)
 
 ## License
 
