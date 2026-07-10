@@ -179,6 +179,102 @@ function runChat(cfg, messages, { onToken, onDone, onError }) {
   else                 callOpenAI(() => callAnthropic(null));
 }
 
+// ── GitHub account integration (tool-calling on OpenAI-compatible providers) ──
+// Non-streaming POST → JSON (used for the tool-calling loop and GitHub calls).
+function postJson(urlStr, headers, bodyObj, cb) {
+  let u;
+  try { u = new URL(urlStr); } catch (e) { return cb(e); }
+  const lib = u.protocol === 'http:' ? require('http') : require('https');
+  const data = Buffer.from(JSON.stringify(bodyObj));
+  const req = lib.request(u, {
+    method: 'POST',
+    headers: { 'User-Agent': 'ClawBridge/1.0', ...headers, 'Content-Length': data.length },
+    timeout: 180000,
+  }, res => {
+    let d = ''; res.on('data', c => d += c);
+    res.on('end', () => {
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        try { cb(null, JSON.parse(d)); } catch (e) { cb(new Error('bad JSON')); }
+      } else { cb(new Error('HTTP ' + res.statusCode + ': ' + d.slice(0, 300))); }
+    });
+  });
+  req.on('error', cb);
+  req.on('timeout', () => req.destroy(new Error('timeout')));
+  req.write(data); req.end();
+}
+
+const GITHUB_TOOLS = [
+  { type: 'function', function: { name: 'github_list_repos',
+    description: "List the authenticated user's GitHub repositories (most recently updated first).",
+    parameters: { type: 'object', properties: {}, required: [] } } },
+  { type: 'function', function: { name: 'github_get_file',
+    description: 'Read the text content of a file in a GitHub repository.',
+    parameters: { type: 'object', properties: { owner: { type: 'string' }, repo: { type: 'string' }, path: { type: 'string' } }, required: ['owner', 'repo', 'path'] } } },
+  { type: 'function', function: { name: 'github_list_issues',
+    description: 'List issues (and pull requests) in a GitHub repository.',
+    parameters: { type: 'object', properties: { owner: { type: 'string' }, repo: { type: 'string' } }, required: ['owner', 'repo'] } } },
+  { type: 'function', function: { name: 'github_search_code',
+    description: 'Search code across GitHub with a query string.',
+    parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } } },
+];
+
+// Execute one GitHub tool call against the REST API with the user's token.
+function callGitHub(token, name, args, cb) {
+  const H = { 'Authorization': 'Bearer ' + token, 'User-Agent': 'ClawBridge', 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  const gh = (q, map) => httpJson('https://api.github.com' + q, H, (e, j) => cb(e ? ('error: ' + e.message) : map(j)));
+  try {
+    if (name === 'github_list_repos')
+      return gh('/user/repos?per_page=30&sort=updated', j => (j || []).map(r => ({ full_name: r.full_name, private: r.private, description: r.description })));
+    if (name === 'github_get_file')
+      return gh(`/repos/${args.owner}/${args.repo}/contents/${encodeURIComponent(args.path)}`, j => {
+        try { return Buffer.from(j.content || '', 'base64').toString('utf8').slice(0, 8000); } catch (_) { return 'error: could not read file'; }
+      });
+    if (name === 'github_list_issues')
+      return gh(`/repos/${args.owner}/${args.repo}/issues?per_page=20`, j => (j || []).map(i => ({ number: i.number, title: i.title, state: i.state, is_pr: !!i.pull_request })));
+    if (name === 'github_search_code')
+      return gh(`/search/code?q=${encodeURIComponent(args.query)}`, j => (j.items || []).slice(0, 10).map(i => ({ repo: i.repository && i.repository.full_name, path: i.path })));
+  } catch (e) { return cb('error: ' + e.message); }
+  cb('error: unknown tool ' + name);
+}
+
+// Agentic loop: let the model call GitHub tools, then answer. OpenAI-compatible.
+function runChatTools(cfg, messages, { onSystem, onDone, onError }) {
+  const apiKey = (cfg.apiKey || '').trim();
+  const base   = (cfg.baseUrl || '').trim().replace(/\/+$/, '');
+  const model  = (cfg.model || '').trim();
+  const root = /\/(v1|openai)$/i.test(base) ? base : base + '/v1';
+  const url = root + '/chat/completions';
+  const headers = { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' };
+  const convo = messages.slice();
+  let iter = 0;
+  const step = () => {
+    if (iter++ > 6) return onDone('[توقّف: عدد كبير من خطوات الأدوات]');
+    postJson(url, headers, { model, messages: convo, tools: GITHUB_TOOLS, tool_choice: 'auto', stream: false }, (err, json) => {
+      if (err) return onError(err);
+      const msg = json.choices && json.choices[0] && json.choices[0].message;
+      if (!msg) return onError(new Error('لا رد من المنصة'));
+      if (msg.tool_calls && msg.tool_calls.length) {
+        convo.push(msg);
+        let k = 0;
+        const runOne = () => {
+          if (k >= msg.tool_calls.length) return step();
+          const tc = msg.tool_calls[k++];
+          let a = {}; try { a = JSON.parse(tc.function.arguments || '{}'); } catch (_) {}
+          onSystem('🔧 GitHub: ' + tc.function.name + (a.repo ? ` (${a.owner ? a.owner + '/' : ''}${a.repo})` : ''));
+          callGitHub(cfg.githubToken, tc.function.name, a, result => {
+            convo.push({ role: 'tool', tool_call_id: tc.id, content: typeof result === 'string' ? result : JSON.stringify(result) });
+            runOne();
+          });
+        };
+        runOne();
+      } else {
+        onDone(msg.content || '');
+      }
+    });
+  };
+  step();
+}
+
 // ── HTTP Router ──────────────────────────────────────────────────────────────
 function router(req, res) {
   const url  = new URL(req.url, `http://localhost:${PORT}`);
@@ -324,16 +420,18 @@ function router(req, res) {
       try {
         const cfg = JSON.parse(body);
         const lines = [];
-        if (cfg.baseUrl) lines.push(`ANTHROPIC_BASE_URL=${cfg.baseUrl}`);
-        if (cfg.apiKey)  lines.push(`ANTHROPIC_API_KEY=${cfg.apiKey}`);
-        if (cfg.model)   lines.push(`ANTHROPIC_MODEL=${cfg.model}`);
+        if (cfg.baseUrl)     lines.push(`ANTHROPIC_BASE_URL=${cfg.baseUrl}`);
+        if (cfg.apiKey)      lines.push(`ANTHROPIC_API_KEY=${cfg.apiKey}`);
+        if (cfg.model)       lines.push(`ANTHROPIC_MODEL=${cfg.model}`);
+        if (cfg.githubToken) lines.push(`GITHUB_TOKEN=${cfg.githubToken}`);
         fs.writeFileSync(CFG_FILE, lines.join('\n') + '\n');
         // Apply to live sessions so a changed key/model/platform takes effect
         // immediately, without needing to start a new session.
         Object.values(sessions).forEach(s => {
-          s.cfg.baseUrl = cfg.baseUrl || '';
-          s.cfg.apiKey  = cfg.apiKey  || '';
-          s.cfg.model   = cfg.model   || '';
+          s.cfg.baseUrl     = cfg.baseUrl     || '';
+          s.cfg.apiKey      = cfg.apiKey      || '';
+          s.cfg.model       = cfg.model       || '';
+          s.cfg.githubToken = cfg.githubToken || '';
         });
         log('Config saved to ' + CFG_FILE);
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -351,10 +449,11 @@ function router(req, res) {
         const req_cfg = JSON.parse(body || '{}');
         const env_cfg = loadEnv();
         const cfg = {
-          apiKey:  req_cfg.apiKey  || env_cfg.ANTHROPIC_API_KEY  || '',
-          baseUrl: req_cfg.baseUrl || env_cfg.ANTHROPIC_BASE_URL || '',
-          model:   req_cfg.model   || env_cfg.ANTHROPIC_MODEL    || '',
-          workdir: req_cfg.workdir || os.homedir(),
+          apiKey:      req_cfg.apiKey      || env_cfg.ANTHROPIC_API_KEY  || '',
+          baseUrl:     req_cfg.baseUrl     || env_cfg.ANTHROPIC_BASE_URL || '',
+          model:       req_cfg.model       || env_cfg.ANTHROPIC_MODEL    || '',
+          githubToken: req_cfg.githubToken || env_cfg.GITHUB_TOKEN       || '',
+          workdir:     req_cfg.workdir     || os.homedir(),
         };
         if (!cfg.apiKey) {
           res.writeHead(400); return res.end(JSON.stringify({ ok: false, error: 'API key not set. Configure it first.' }));
@@ -411,9 +510,10 @@ function router(req, res) {
       // .env only for fields the session didn't provide.
       const env = loadEnv();
       const cfg = {
-        apiKey:  session.cfg.apiKey  || env.ANTHROPIC_API_KEY  || '',
-        baseUrl: session.cfg.baseUrl || env.ANTHROPIC_BASE_URL || '',
-        model:   session.cfg.model   || env.ANTHROPIC_MODEL    || '',
+        apiKey:      session.cfg.apiKey      || env.ANTHROPIC_API_KEY  || '',
+        baseUrl:     session.cfg.baseUrl     || env.ANTHROPIC_BASE_URL || '',
+        model:       session.cfg.model       || env.ANTHROPIC_MODEL    || '',
+        githubToken: session.cfg.githubToken || env.GITHUB_TOKEN        || '',
       };
 
       // Record + echo the user's message, then ack the POST immediately.
@@ -424,23 +524,52 @@ function router(req, res) {
 
       if (session.busy) { pushEntry(session, 'system', '[انتظر — يوجد رد قيد التوليد]'); return; }
       session.busy = true;
-      let acc = '';
-      pushEntry(session, 'assistant_start', '');
-      runChat(cfg, session.messages, {
-        onToken: t => { acc += t; pushEntry(session, 'assistant', t); },
-        onDone: () => {
-          session.messages.push({ role: 'assistant', content: acc });
-          pushEntry(session, 'assistant_done', '');
-          session.busy = false;
-        },
-        onError: e => {
-          // roll back the failed turn so the next try starts clean
-          if (session.messages[session.messages.length - 1]?.role === 'user') session.messages.pop();
-          pushEntry(session, 'error', 'تعذّر الاتصال بالمنصة: ' + e.message);
-          pushEntry(session, 'assistant_done', '');
-          session.busy = false;
-        },
-      });
+
+      // Normal streaming reply.
+      const plainChat = () => {
+        let acc = '';
+        pushEntry(session, 'assistant_start', '');
+        runChat(cfg, session.messages, {
+          onToken: t => { acc += t; pushEntry(session, 'assistant', t); },
+          onDone: () => {
+            session.messages.push({ role: 'assistant', content: acc });
+            pushEntry(session, 'assistant_done', '');
+            session.busy = false;
+          },
+          onError: e => {
+            if (session.messages[session.messages.length - 1]?.role === 'user') session.messages.pop();
+            pushEntry(session, 'error', 'تعذّر الاتصال بالمنصة: ' + e.message);
+            pushEntry(session, 'assistant_done', '');
+            session.busy = false;
+          },
+        });
+      };
+
+      // GitHub tools only apply on OpenAI-compatible providers (not Anthropic gateways).
+      const openaiCompatible = !(!cfg.baseUrl || /anthropic\.com/i.test(cfg.baseUrl) || /aerolink|agentrouter|bynara/i.test(cfg.baseUrl));
+      if (cfg.githubToken && openaiCompatible) {
+        let toolActivity = false;
+        runChatTools(cfg, session.messages, {
+          onSystem: t => { toolActivity = true; pushEntry(session, 'system', t); },
+          onDone: content => {
+            pushEntry(session, 'assistant_start', '');
+            if (content) pushEntry(session, 'assistant', content);
+            session.messages.push({ role: 'assistant', content });
+            pushEntry(session, 'assistant_done', '');
+            session.busy = false;
+          },
+          onError: e => {
+            // If the model doesn't support tools and nothing happened yet, fall back.
+            if (!toolActivity) { plainChat(); return; }
+            if (session.messages[session.messages.length - 1]?.role === 'user') session.messages.pop();
+            pushEntry(session, 'error', 'تعذّر: ' + e.message);
+            pushEntry(session, 'assistant_done', '');
+            session.busy = false;
+          },
+        });
+      } else {
+        plainChat();
+      }
     });
   }
 
